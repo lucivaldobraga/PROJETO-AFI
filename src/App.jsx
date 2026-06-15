@@ -1,30 +1,31 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   PieChart, Pie, Cell, FunnelChart, Funnel 
 } from 'recharts';
 import { 
   LayoutDashboard, TrendingUp, AlertTriangle, Upload, Users, LogOut, Sun, Moon, Search, 
-  Download, FileSpreadsheet, Plus, ShieldCheck, ChevronRight, FileDown, Eye, HelpCircle
+  Download, FileSpreadsheet, Plus, ShieldCheck, FileDown, Lock, Eye, AlertCircle, RefreshCw
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { mockOrcamentos, mockArquivos } from './mockData';
 
-// Cores Curadas para Modo Escuro/Claro (Paleta HSL Violeta/Indico/Slate)
-const COLORS = ['#6366f1', '#a855f7', '#ec4899', '#f43f5e', '#e11d48', '#3b82f6', '#06b6d4', '#10b981'];
+const COLORS = ['#6366f1', '#8b5cf6', '#d946ef', '#ec4899', '#f43f5e', '#3b82f6', '#06b6d4', '#10b981'];
 
 export default function App() {
-  // Configurações Globais
+  // Controle de Autenticação
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // Estados Globais
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [user, setUser] = useState({
-    email: 'lucivaldo586@gmail.com',
-    name: 'Lucivaldo Braga',
-    role: 'admin'
-  });
+  const [user, setUser] = useState(null);
   
-  // Banco de Dados Local / Integrado
+  // Dados orçamentários & Importados
   const [dados, setDados] = useState(mockOrcamentos);
   const [arquivos, setArquivos] = useState(mockArquivos);
   const [usuariosAutorizados, setUsuariosAutorizados] = useState([
@@ -37,13 +38,13 @@ export default function App() {
   const [filtroAno, setFiltroAno] = useState('Todos');
   const [filtroNatureza, setFiltroNatureza] = useState('Todos');
   const [filtroUO, setFiltroUO] = useState('Todos');
-  
-  // Form de Cadastro de Usuário
+
+  // Form de Cadastro
   const [novoEmail, setNovoEmail] = useState('');
   const [novoNome, setNovoNome] = useState('');
   const [novoCargo, setNovoCargo] = useState('viewer');
 
-  // Controle de Tema
+  // Tema Claro/Escuro
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
@@ -53,6 +54,39 @@ export default function App() {
       localStorage.setItem('theme', 'light');
     }
   }, [darkMode]);
+
+  // Lógica de Login (E-mail e Senha)
+  const handleLogin = (e) => {
+    e.preventDefault();
+    setLoginError('');
+    
+    // Admin Padrão Inicial
+    if (emailInput === 'lucivaldo586@gmail.com' && passwordInput === 'admin123') {
+      setUser({
+        email: 'lucivaldo586@gmail.com',
+        name: 'Lucivaldo Braga',
+        role: 'admin'
+      });
+      setIsAuthenticated(true);
+      return;
+    }
+
+    // Outros usuários cadastrados
+    const usuarioExiste = usuariosAutorizados.find(u => u.email === emailInput);
+    if (usuarioExiste && passwordInput === '123456') {
+      setUser(usuarioExiste);
+      setIsAuthenticated(true);
+    } else {
+      setLoginError('E-mail ou senha incorretos! Use as credenciais padrões do administrador.');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUser(null);
+    setEmailInput('');
+    setPasswordInput('');
+  };
 
   // Restrição de Rede Futura (Comentário Estruturado)
   /* 
@@ -68,7 +102,7 @@ export default function App() {
    *    - Se o IP não for válido, renderizar uma tela de bloqueio e impedir carregamento do dashboard.
    */
 
-  // Filtragem dos dados
+  // Filtragem dos dados orçamentários
   const dadosFiltrados = dados.filter(item => {
     const termo = busca.toLowerCase();
     const bateBusca = 
@@ -77,19 +111,15 @@ export default function App() {
       item.Processo.toLowerCase().includes(termo) ||
       item.Natureza.toLowerCase().includes(termo) ||
       item.PT.toLowerCase().includes(termo) ||
-      item.Fonte.toLowerCase().includes(termo) ||
       item.UO.toLowerCase().includes(termo);
 
     const bateAno = filtroAno === 'Todos' || item.Ano_Processo === filtroAno;
-    const bateNatureza = filtroNatureza === 'Todos' || item.Natureza.includes(filtroNatureza);
     const bateUO = filtroUO === 'Todos' || item.UO === filtroUO;
 
-    return bateBusca && bateAno && bateNatureza && bateUO;
+    return bateBusca && bateAno && bateUO;
   });
 
-  // Lista única para preencher selects de filtros
   const anosDisponiveis = ['Todos', ...new Set(dados.map(item => item.Ano_Processo))];
-  const naturezasDisponiveis = ['Todos', ...new Set(dados.map(item => item.Natureza.split(' - ')[0]))];
   const uosDisponiveis = ['Todos', ...new Set(dados.map(item => item.UO))];
 
   // Cálculos de KPIs
@@ -110,43 +140,31 @@ export default function App() {
 
   const percentualExecucao = totais.empAcum > 0 ? (totais.pagoAcum / totais.empAcum) * 100 : 0;
 
-  // Empenhos agendados para hoje (simulados baseados na data atual 15/06/2026)
-  const empenhosHoje = dadosFiltrados.filter(item => item.Data_Emis === '15/06/2026');
-  const valorHoje = empenhosHoje.reduce((sum, item) => sum + item.Pago_Mes, 0);
+  // Empenhos agendados para hoje (simulado com base no lote Sefaz de 05/01/2026 do PDF)
+  const empenhosHoje = dadosFiltrados.filter(item => item.Data_Emis === '05/01/2026');
+  const valorHoje = empenhosHoje.reduce((sum, item) => sum + item.Pago_Acum, 0);
 
-  // Formatação monetária BRL
+  // Formatação monetária padrão brasileira (R$)
   const formatarMoeda = (valor) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
   };
 
-  // Exportação da Página Atual para PDF
+  // Exportar Página para PDF
   const exportarPDF = () => {
-    const input = document.getElementById('dashboard-content');
+    const input = document.getElementById('dashboard-view');
     html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgWidth = 210;
-      const pageHeight = 295;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
       pdf.save(`relatorio_orcamentario_${currentPage}.pdf`);
     });
   };
 
-  // Exportação dos dados atuais para XLS (CSV simulando Excel com codificação UTF-8)
+  // Exportar Tabela para XLS
   const exportarXLS = () => {
-    let csvContent = "\uFEFF"; // Garante acentuação correta no Excel brasileiro
+    let csvContent = "\uFEFF";
     csvContent += "Num_NE;Credor;Processo;Data_Emis;UO;PT;Fonte;Natureza;Emp_Mes;Emp_Acum;Liq_Mes;Liq_Acum;A_Liquidar;Pago_Mes;Pago_Acum;A_Pagar;Ano_Processo\n";
     
     dadosFiltrados.forEach(row => {
@@ -157,83 +175,51 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `tabela_tratada_${new Date().toLocaleDateString('pt-BR')}.csv`);
+    link.setAttribute("download", `tabela_AFI_tratada.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Upload simulado de planilha
+  // Upload simulado integrado
   const handleUploadFake = (e) => {
     const files = e.target.files;
     if (files.length === 0) return;
-    
     const file = files[0];
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      // Cria registro mockado simulando o retorno da Cloud Function
-      const novoArquivo = {
-        nome_original: file.name,
-        caminho_bruto: `bruto/${file.name}`,
-        caminho_tratado: `tratado/${file.name.replace('.xls', '.xlsx')}`,
-        total_linhas: 15,
-        processado_em: new Date().toLocaleString('pt-BR'),
-        status: 'sucesso'
-      };
-      
-      setArquivos([novoArquivo, ...arquivos]);
-      
-      // Adiciona itens mocks adicionais
-      const novosRegistros = [
-        {
-          Num_NE: "2026NE" + Math.floor(1000 + Math.random() * 9000),
-          Credor: "CETAM PRESTADORES DE SERVIÇO",
-          Processo: "08912/2026",
-          Data_Emis: "15/06/2026",
-          UO: "CETAM",
-          PT: "12.361.3190.2814",
-          Fonte: "0100",
-          Natureza: "339036 - OUTROS SERVIÇOS DE TERCEIROS - PF",
-          Emp_Mes: 300000.00,
-          Emp_Acum: 900000.00,
-          Liq_Mes: 250000.00,
-          Liq_Acum: 800000.00,
-          A_Liquidar: 100000.00,
-          Pago_Mes: 200000.00,
-          Pago_Acum: 750000.00,
-          A_Pagar: 50000.00,
-          Ano_Processo: "2026"
-        }
-      ];
-
-      setDados([...novosRegistros, ...dados]);
-      alert("Planilha enviada com sucesso! A Cloud Function em Python tratou a planilha bruto e atualizou os gráficos.");
+    
+    const novoArquivo = {
+      nome_original: file.name,
+      caminho_bruto: `bruto/${file.name}`,
+      caminho_tratado: `tratado/${file.name.replace('.xls', '.xlsx')}`,
+      total_linhas: 32,
+      processado_em: new Date().toLocaleString('pt-BR'),
+      status: 'sucesso'
     };
-    reader.readAsArrayBuffer(file);
+    
+    setArquivos([novoArquivo, ...arquivos]);
+    alert("Arquivo bruto (.xls) processado com sucesso em segundo plano via Pandas!");
   };
 
-  // Novo Cadastro de Usuário (Admin)
+  // Cadastrar novos e-mails autorizados
   const cadastrarUsuario = (e) => {
     e.preventDefault();
     if (!novoEmail || !novoNome) return;
     setUsuariosAutorizados([...usuariosAutorizados, { email: novoEmail, name: novoNome, role: novoCargo }]);
     setNovoEmail('');
     setNovoNome('');
-    alert(`Usuário ${novoNome} autorizado com sucesso no sistema!`);
+    alert(`Usuário ${novoNome} cadastrado com sucesso!`);
   };
 
   // Preparação de dados para Gráficos
-  // 1. Evolução mensal dos pagamentos
   const dataEvolucaoMensal = [
-    { name: 'Jan', Empenhado: totais.empAcum * 0.15, Pago: totais.pagoAcum * 0.12 },
-    { name: 'Fev', Empenhado: totais.empAcum * 0.30, Pago: totais.pagoAcum * 0.25 },
-    { name: 'Mar', Empenhado: totais.empAcum * 0.45, Pago: totais.pagoAcum * 0.38 },
-    { name: 'Abr', Empenhado: totais.empAcum * 0.65, Pago: totais.pagoAcum * 0.55 },
-    { name: 'Mai', Empenhado: totais.empAcum * 0.85, Pago: totais.pagoAcum * 0.75 },
+    { name: 'Jan', Empenhado: totais.empAcum * 0.2, Pago: totais.pagoAcum * 0.15 },
+    { name: 'Fev', Empenhado: totais.empAcum * 0.4, Pago: totais.pagoAcum * 0.35 },
+    { name: 'Mar', Empenhado: totais.empAcum * 0.6, Pago: totais.pagoAcum * 0.55 },
+    { name: 'Abr', Empenhado: totais.empAcum * 0.8, Pago: totais.pagoAcum * 0.70 },
+    { name: 'Mai', Empenhado: totais.empAcum * 0.9, Pago: totais.pagoAcum * 0.85 },
     { name: 'Jun', Empenhado: totais.empAcum, Pago: totais.pagoAcum }
   ];
 
-  // 2. Gráfico por Natureza (Rosca)
   const despesasPorNatureza = dadosFiltrados.reduce((acc, item) => {
     const nat = item.Natureza.split(' - ')[0];
     const existente = acc.find(x => x.name === nat);
@@ -245,7 +231,6 @@ export default function App() {
     return acc;
   }, []);
 
-  // 3. Pago e Empenhado por Exercício/Ano
   const totalPorAno = dadosFiltrados.reduce((acc, item) => {
     const ano = item.Ano_Processo;
     const existente = acc.find(x => x.ano === ano);
@@ -258,206 +243,264 @@ export default function App() {
     return acc;
   }, []).sort((a, b) => a.ano.localeCompare(b.ano));
 
-  // 4. Maiores Orçamentos por Credor
   const maioresCredores = [...dadosFiltrados]
     .sort((a, b) => b.Emp_Acum - a.Emp_Acum)
     .slice(0, 5)
-    .map(x => ({ name: x.Credor.substring(0, 15) + '...', Empenhado: x.Emp_Acum, Pago: x.Pago_Acum }));
+    .map(x => ({ name: x.Credor.substring(0, 20) + '...', Empenhado: x.Emp_Acum, Pago: x.Pago_Acum }));
 
-  // 5. Funil
   const dataFunil = [
-    { value: totais.empAcum, name: '1. Empenhado', fill: '#6366f1' },
-    { value: totais.liqAcum, name: '2. Liquidado', fill: '#a855f7' },
-    { value: totais.pagoAcum, name: '3. Pago', fill: '#10b981' }
+    { value: totais.empAcum, name: 'Empenhado', fill: '#6366f1' },
+    { value: totais.liqAcum, name: 'Liquidado', fill: '#8b5cf6' },
+    { value: totais.pagoAcum, name: 'Pago', fill: '#10b981' }
   ];
 
+  // Renderizar Tela de Login se não autenticado
+  if (!isAuthenticated) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+        <div className={`w-full max-w-md p-8 rounded-3xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-2xl shadow-indigo-500/5`}>
+          <div className="flex flex-col items-center mb-8">
+            <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-extrabold text-2xl shadow-xl shadow-indigo-600/20 mb-3">
+              AFI
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight">Entrar no Sistema</h2>
+            <p className="text-sm text-slate-400 mt-1">Análise Orçamentária Avançada CETAM</p>
+          </div>
+
+          {loginError && (
+            <div className="p-3 mb-4 rounded-xl text-xs font-semibold bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 flex items-center gap-2">
+              <AlertCircle size={16} /> {loginError}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-400 block mb-1">Endereço de E-mail</label>
+              <input 
+                type="email" 
+                required
+                placeholder="lucivaldo586@gmail.com"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                className={`w-full px-4 py-3 rounded-xl border outline-none text-sm ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-400 block mb-1">Senha de Acesso</label>
+              <input 
+                type="password" 
+                required
+                placeholder="••••••••"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                className={`w-full px-4 py-3 rounded-xl border outline-none text-sm ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
+              />
+            </div>
+
+            <button 
+              type="submit"
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-lg shadow-indigo-600/10 transition duration-150"
+            >
+              Autenticar
+            </button>
+          </form>
+
+          <div className="mt-6 p-4 rounded-xl bg-slate-100 dark:bg-slate-800/50 text-center">
+            <span className="text-xs text-slate-500">
+              💡 Credenciais do Administrador Padrão:<br />
+              <b>lucivaldo586@gmail.com</b> / <b>admin123</b>
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Renderizar o Dashboard Completo
   return (
-    <div className={`min-h-screen flex ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+    <div className={`min-h-screen flex ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-850'}`}>
       
-      {/* Sidebar Fixo lateral */}
-      <aside className={`w-72 flex-shrink-0 border-r ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'} p-6 flex flex-col justify-between`}>
+      {/* Sidebar Fixo Lateral */}
+      <aside className={`w-72 flex-shrink-0 border-r ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200/60 bg-white'} p-6 flex flex-col justify-between`}>
         <div>
           {/* Logo / Header */}
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/30">
+          <div className="flex items-center gap-3 mb-10">
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-600/20">
               AFI
             </div>
             <div>
-              <h1 className="font-bold text-lg leading-none">CETAM</h1>
-              <span className="text-xs text-slate-500">Orçamento Avançado</span>
+              <h1 className="font-bold text-base leading-none">CETAM</h1>
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Orçamento</span>
             </div>
           </div>
 
-          {/* Menu de Navegação */}
-          <nav className="space-y-2">
+          {/* Navegação */}
+          <nav className="space-y-1">
             <button 
               onClick={() => setCurrentPage('dashboard')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${currentPage === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
             >
-              <LayoutDashboard size={20} />
-              <span className="font-semibold text-sm">Dashboard Geral</span>
+              <LayoutDashboard size={18} /> Dashboard Geral
             </button>
             <button 
               onClick={() => setCurrentPage('avancados')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${currentPage === 'avancados' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'avancados' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
             >
-              <TrendingUp size={20} />
-              <span className="font-semibold text-sm">Visuais Avançados</span>
+              <TrendingUp size={18} /> Visuais Avançados
             </button>
             <button 
               onClick={() => setCurrentPage('auditoria')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${currentPage === 'auditoria' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'auditoria' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
             >
-              <AlertTriangle size={20} />
-              <span className="font-semibold text-sm">Matriz de Gargalos</span>
+              <AlertTriangle size={18} /> Matriz de Gargalos
             </button>
             <button 
               onClick={() => setCurrentPage('upload')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${currentPage === 'upload' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'upload' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
             >
-              <Upload size={20} />
-              <span className="font-semibold text-sm">Upload e Histórico</span>
+              <Upload size={18} /> Upload e Histórico
             </button>
             
-            {/* Rota Protegida (Lucivaldo) */}
-            {user.email === 'lucivaldo586@gmail.com' && (
+            {user?.email === 'lucivaldo586@gmail.com' && (
               <button 
                 onClick={() => setCurrentPage('usuarios')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${currentPage === 'usuarios' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'usuarios' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
               >
-                <Users size={20} />
-                <span className="font-semibold text-sm">Usuários (Admin)</span>
+                <Users size={18} /> Cadastrar Usuários
               </button>
             )}
           </nav>
         </div>
 
-        {/* Perfil & Configurações de Rodapé */}
+        {/* Rodapé e Usuário Conectado */}
         <div className="space-y-4">
-          {/* Alternador de Modo Escuro */}
-          <div className={`flex items-center justify-between p-2 rounded-xl ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
-            <span className="text-xs font-semibold px-2 text-slate-500">Aparência</span>
+          <div className={`flex items-center justify-between p-1.5 rounded-xl ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+            <span className="text-xs font-semibold px-2 text-slate-400">Tema</span>
             <button 
               onClick={() => setDarkMode(!darkMode)}
-              className="p-1.5 rounded-lg bg-indigo-600 text-white shadow"
+              className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-md"
             >
-              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+              {darkMode ? <Sun size={14} /> : <Moon size={14} />}
             </button>
           </div>
 
-          {/* Usuário Conectado */}
-          <div className="flex items-center gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-            <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-bold text-white uppercase">
-              {user.name.substring(0, 2)}
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white uppercase">
+                {user?.name.substring(0, 2)}
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-xs font-bold truncate">{user?.name}</p>
+                <span className="text-[10px] text-slate-400 truncate block">Administrador</span>
+              </div>
             </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-semibold truncate leading-none mb-1">{user.name}</p>
-              <span className="text-xs text-slate-500 truncate flex items-center gap-1">
-                <ShieldCheck size={12} className="text-emerald-500" /> Administrador
-              </span>
-            </div>
+            
+            <button 
+              onClick={handleLogout}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition"
+              title="Sair do sistema"
+            >
+              <LogOut size={16} />
+            </button>
           </div>
         </div>
       </aside>
 
       {/* Conteúdo Principal */}
-      <main className="flex-1 overflow-y-auto p-10" id="dashboard-content">
+      <main className="flex-1 overflow-y-auto p-10" id="dashboard-view">
         
         {/* Topbar Header */}
         <header className="flex justify-between items-center mb-8">
           <div>
-            <span className="text-sm font-medium text-slate-400">CETAM AM</span>
-            <h2 className="text-3xl font-bold tracking-tight">Análise AFI Orçamentária</h2>
+            <span className="text-xs font-bold text-slate-400 tracking-widest uppercase">CETAM - Amazonas</span>
+            <h2 className="text-3xl font-extrabold tracking-tight">Painel de Execução AFI</h2>
           </div>
           <div className="flex items-center gap-3">
             <button 
               onClick={exportarPDF} 
               className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-indigo-600/10 transition"
             >
-              <FileDown size={18} /> Exportar PDF
+              <FileDown size={16} /> Exportar PDF
             </button>
             <button 
               onClick={exportarXLS} 
               className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-sm font-semibold shadow-md transition"
             >
-              <Download size={18} /> Exportar Tabela
+              <Download size={16} /> Exportar Excel
             </button>
           </div>
         </header>
 
-        {/* Painel Central */}
+        {/* Telas da Aplicação */}
         {currentPage === 'dashboard' && (
           <div className="space-y-8 animate-fadeIn">
-            {/* Barra de Filtros Integrados */}
-            <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm space-y-4`}>
-              <div className="flex flex-col md:flex-row gap-4">
-                {/* Busca Reativa Única */}
-                <div className="flex-1 relative">
-                  <Search className="absolute left-4 top-3.5 text-slate-400" size={18} />
-                  <input 
-                    type="text" 
-                    placeholder="Pesquisar por Credor, NE, Processo, Natureza, PT, Fonte..." 
-                    value={busca}
-                    onChange={(e) => setBusca(e.target.value)}
-                    className={`w-full pl-11 pr-4 py-3 rounded-xl border outline-none text-sm transition ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
-                  />
-                </div>
+            
+            {/* Barra de Busca Reativa */}
+            <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm flex flex-col md:flex-row gap-4`}>
+              <div className="flex-1 relative">
+                <Search className="absolute left-4 top-3 text-slate-400" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Filtrar por Credor, NE, Processo, Natureza, PT, UO..." 
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  className={`w-full pl-11 pr-4 py-2.5 rounded-xl border outline-none text-sm transition ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
+                />
+              </div>
 
-                {/* Filtro Ano */}
-                <div className="w-full md:w-48">
-                  <select 
-                    value={filtroAno} 
-                    onChange={(e) => setFiltroAno(e.target.value)}
-                    className={`w-full px-4 py-3 rounded-xl border outline-none text-sm ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
-                  >
-                    {anosDisponiveis.map(ano => <option key={ano} value={ano}>Ano: {ano}</option>)}
-                  </select>
-                </div>
+              <div className="w-full md:w-48">
+                <select 
+                  value={filtroAno} 
+                  onChange={(e) => setFiltroAno(e.target.value)}
+                  className={`w-full px-4 py-2.5 rounded-xl border outline-none text-sm ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                >
+                  {anosDisponiveis.map(ano => <option key={ano} value={ano}>Exercício: {ano}</option>)}
+                </select>
               </div>
             </div>
 
-            {/* KPIs Grid */}
+            {/* KPIs Grid - Padrão R$ e Formatos */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <span className="text-xs font-semibold text-slate-400">Empenhado (Mês)</span>
-                <p className="text-2xl font-bold tracking-tight mt-1">{formatarMoeda(totais.empMes)}</p>
+              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
+                <span className="text-xs font-semibold text-slate-400">Empenhado no Mês</span>
+                <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.empMes)}</p>
               </div>
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <span className="text-xs font-semibold text-slate-400">Empenhado (Acumulado)</span>
-                <p className="text-2xl font-bold tracking-tight mt-1 text-indigo-500">{formatarMoeda(totais.empAcum)}</p>
+              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
+                <span className="text-xs font-semibold text-slate-400">Empenhado Mês (Acumulado)</span>
+                <p className="text-xl font-extrabold tracking-tight mt-1 text-indigo-500">{formatarMoeda(totais.empAcum)}</p>
               </div>
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <span className="text-xs font-semibold text-slate-400">Liquidado (Mês)</span>
-                <p className="text-2xl font-bold tracking-tight mt-1">{formatarMoeda(totais.liqMes)}</p>
+              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
+                <span className="text-xs font-semibold text-slate-400">Liquidado no Mês</span>
+                <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.liqMes)}</p>
               </div>
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <span className="text-xs font-semibold text-slate-400">Liquidado (Acumulado)</span>
-                <p className="text-2xl font-bold tracking-tight mt-1 text-purple-500">{formatarMoeda(totais.liqAcum)}</p>
+              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
+                <span className="text-xs font-semibold text-slate-400">Liquidado Mês (Acumulado)</span>
+                <p className="text-xl font-extrabold tracking-tight mt-1 text-purple-500">{formatarMoeda(totais.liqAcum)}</p>
               </div>
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
+              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
                 <span className="text-xs font-semibold text-slate-400">A Liquidar</span>
-                <p className="text-2xl font-bold tracking-tight mt-1 text-amber-500">{formatarMoeda(totais.aLiquidar)}</p>
+                <p className="text-xl font-extrabold tracking-tight mt-1 text-amber-500">{formatarMoeda(totais.aLiquidar)}</p>
               </div>
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <span className="text-xs font-semibold text-slate-400">Pago (Acumulado)</span>
-                <p className="text-2xl font-bold tracking-tight mt-1 text-emerald-500">{formatarMoeda(totais.pagoAcum)}</p>
+              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
+                <span className="text-xs font-semibold text-slate-400">Pago no Mês</span>
+                <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.pagoMes)}</p>
               </div>
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
+              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
+                <span className="text-xs font-semibold text-slate-400">Pago Mês (Acumulado)</span>
+                <p className="text-xl font-extrabold tracking-tight mt-1 text-emerald-500">{formatarMoeda(totais.pagoAcum)}</p>
+              </div>
+              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
                 <span className="text-xs font-semibold text-slate-400">A Pagar</span>
-                <p className="text-2xl font-bold tracking-tight mt-1 text-rose-500">{formatarMoeda(totais.aPagar)}</p>
-              </div>
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <span className="text-xs font-semibold text-slate-400">% Execução Orçamentária</span>
-                <p className="text-2xl font-bold tracking-tight mt-1 text-blue-500">{percentualExecucao.toFixed(1)}%</p>
+                <p className="text-xl font-extrabold tracking-tight mt-1 text-rose-500">{formatarMoeda(totais.aPagar)}</p>
               </div>
             </div>
 
-            {/* Graficos Principais */}
+            {/* Gráficos de Evolução Mensal e Exercícios Anteriores */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Gráfico 1: Evolução Mensal dos Pagamentos */}
               <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <h3 className="text-lg font-bold mb-4">Evolução Mensal (Empenhado vs Pago)</h3>
-                <div className="h-80">
+                <h3 className="text-base font-bold mb-4">Evolução Mensal (Empenhado vs Pago)</h3>
+                <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={dataEvolucaoMensal}>
                       <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
@@ -465,17 +508,16 @@ export default function App() {
                       <YAxis stroke={darkMode ? "#94a3b8" : "#64748b"} />
                       <Tooltip />
                       <Legend />
-                      <Line type="monotone" dataKey="Empenhado" stroke="#6366f1" strokeWidth={3} activeDot={{ r: 8 }} />
+                      <Line type="monotone" dataKey="Empenhado" stroke="#6366f1" strokeWidth={3} />
                       <Line type="monotone" dataKey="Pago" stroke="#10b981" strokeWidth={3} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              {/* Gráfico 2: Pago vs Empenhado por Exercício */}
               <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <h3 className="text-lg font-bold mb-4">Exercícios Anteriores (Comparativo Anual)</h3>
-                <div className="h-80">
+                <h3 className="text-base font-bold mb-4">Total Pago vs Empenhado por Exercício</h3>
+                <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={totalPorAno}>
                       <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
@@ -491,57 +533,54 @@ export default function App() {
               </div>
             </div>
 
-            {/* Outros Gráficos Adicionais */}
+            {/* Maiores Orçamentos & Empenhos de Hoje */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Gráfico 3: Maiores Credores por Orçamento */}
               <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <h3 className="text-lg font-bold mb-4">Top 5 Credores (Maiores Empenhos)</h3>
-                <div className="h-80">
+                <h3 className="text-base font-bold mb-4">Maiores Orçamentos (Top 5 Credores)</h3>
+                <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={maioresCredores} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
                       <XAxis type="number" stroke={darkMode ? "#94a3b8" : "#64748b"} />
                       <YAxis dataKey="name" type="category" stroke={darkMode ? "#94a3b8" : "#64748b"} width={100} />
                       <Tooltip />
-                      <Legend />
                       <Bar dataKey="Empenhado" fill="#ec4899" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              {/* Tabela de Empenhos de Hoje */}
               <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
                 <div className="flex justify-between items-center mb-4">
                   <div>
-                    <h3 className="text-lg font-bold">Empenhos para a Data de Hoje</h3>
-                    <p className="text-xs text-slate-500">Filtrado automaticamente para 15/06/2026</p>
+                    <h3 className="text-base font-bold">Empenhos para a Data de Hoje</h3>
+                    <p className="text-[10px] text-slate-500">Filtrado automaticamente para 05/01/2026</p>
                   </div>
-                  <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                  <span className="px-3 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded-lg text-xs font-bold">
                     Total: {formatarMoeda(valorHoje)}
                   </span>
                 </div>
-                <div className="overflow-x-auto h-72">
-                  <table className="w-full text-left border-collapse">
+                <div className="overflow-y-auto h-60">
+                  <table className="w-full text-left">
                     <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-800">
-                        <th className="py-2.5 text-xs font-semibold text-slate-400">Credor</th>
-                        <th className="py-2.5 text-xs font-semibold text-slate-400">Num NE</th>
-                        <th className="py-2.5 text-xs font-semibold text-slate-400 text-right">Valor Pago Mês</th>
+                      <tr className="border-b border-slate-100 dark:border-slate-800">
+                        <th className="py-2 text-xs font-semibold text-slate-400">Credor</th>
+                        <th className="py-2 text-xs font-semibold text-slate-400">Num NE</th>
+                        <th className="py-2 text-xs font-semibold text-slate-400 text-right">Valor Empenhado</th>
                       </tr>
                     </thead>
                     <tbody>
                       {empenhosHoje.length > 0 ? (
                         empenhosHoje.map((item, idx) => (
-                          <tr key={idx} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                            <td className="py-3 text-sm font-semibold truncate max-w-xs">{item.Credor}</td>
-                            <td className="py-3 text-sm">{item.Num_NE}</td>
-                            <td className="py-3 text-sm font-bold text-right text-emerald-500">{formatarMoeda(item.Pago_Mes)}</td>
+                          <tr key={idx} className="border-b border-slate-50 dark:border-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/20 text-xs">
+                            <td className="py-2.5 font-semibold truncate max-w-xs">{item.Credor}</td>
+                            <td className="py-2.5 text-slate-500">{item.Num_NE}</td>
+                            <td className="py-2.5 font-bold text-right text-emerald-500">{formatarMoeda(item.Emp_Acum)}</td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="3" className="py-8 text-center text-sm text-slate-500">Nenhum empenho agendado para o dia de hoje.</td>
+                          <td colSpan="3" className="py-8 text-center text-xs text-slate-400">Nenhum registro hoje.</td>
                         </tr>
                       )}
                     </tbody>
@@ -549,20 +588,19 @@ export default function App() {
                 </div>
               </div>
             </div>
+
           </div>
         )}
 
-        {/* Visuais Avançados (Análise de Eficiência) */}
+        {/* Visuais Avançados (Rosca por Natureza, Velocímetro e Funil) */}
         {currentPage === 'avancados' && (
           <div className="space-y-8 animate-fadeIn">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               
-              {/* Rosca de Despesas por Natureza */}
               <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm col-span-2`}>
-                <h3 className="text-lg font-bold mb-2">Despesas por Natureza de Pagamento</h3>
-                <p className="text-xs text-slate-500 mb-6">Distribuição percentual dos recursos empenhados acumulados</p>
-                <div className="h-80 flex flex-col md:flex-row items-center justify-around">
-                  <div className="h-64 w-64">
+                <h3 className="text-base font-bold mb-4">Empenhos por Natureza de Pagamento</h3>
+                <div className="h-72 flex flex-col md:flex-row items-center justify-around">
+                  <div className="h-56 w-56">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -570,8 +608,8 @@ export default function App() {
                           cx="50%"
                           cy="50%"
                           innerRadius={60}
-                          outerRadius={90}
-                          paddingAngle={5}
+                          outerRadius={80}
+                          paddingAngle={3}
                           dataKey="value"
                         >
                           {despesasPorNatureza.map((entry, index) => (
@@ -582,56 +620,49 @@ export default function App() {
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                  <div className="space-y-2 max-h-56 overflow-y-auto text-xs">
                     {despesasPorNatureza.map((entry, index) => (
                       <div key={index} className="flex items-center gap-2">
-                        <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                        <span className="text-xs font-medium truncate max-w-xs">{entry.name}: {formatarMoeda(entry.value)}</span>
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                        <span className="font-medium truncate max-w-xs">{entry.name}: {formatarMoeda(entry.value)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
 
-              {/* Gauge de Execução Orçamentária */}
+              {/* Indicador Velocímetro de Execução */}
               <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm flex flex-col items-center justify-center`}>
-                <h3 className="text-lg font-bold mb-2 text-center w-full">Meta de Execução</h3>
-                <p className="text-xs text-slate-500 mb-8 text-center w-full">Percentual geral Pago acumulado / Empenhado acumulado</p>
-                
-                {/* Velocímetro Simplificado */}
-                <div className="relative w-48 h-24 overflow-hidden mb-4">
-                  <div className="absolute top-0 left-0 w-48 h-48 rounded-full border-12 border-slate-200 dark:border-slate-800"></div>
+                <h3 className="text-base font-bold mb-2">Execução Orçamentária Geral</h3>
+                <div className="relative w-44 h-22 overflow-hidden mb-4">
+                  <div className="absolute top-0 left-0 w-44 h-44 rounded-full border-12 border-slate-200 dark:border-slate-800"></div>
                   <div 
-                    className="absolute top-0 left-0 w-48 h-48 rounded-full border-12 border-indigo-600 transition-all duration-1000"
+                    className="absolute top-0 left-0 w-44 h-44 rounded-full border-12 border-indigo-600 transition-transform duration-700"
                     style={{
                       clipPath: 'polygon(0 50%, 100% 50%, 100% 0, 0 0)',
                       transform: `rotate(${Math.min(180, (percentualExecucao / 100) * 180)}deg)`,
                       transformOrigin: '50% 50%'
                     }}
                   ></div>
-                  <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center justify-end">
-                    <span className="text-4xl font-extrabold tracking-tight">{percentualExecucao.toFixed(1)}%</span>
+                  <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center">
+                    <span className="text-3xl font-extrabold">{percentualExecucao.toFixed(1)}%</span>
                   </div>
                 </div>
-                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
-                  {percentualExecucao > 75 ? "Eficiência Alta" : percentualExecucao > 40 ? "Eficiência Média" : "Eficiência Crítica"}
+                <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-500">
+                  {percentualExecucao > 75 ? "EFICIÊNCIA ORÇAMENTÁRIA ALTA" : "EFICIÊNCIA MODERADA"}
                 </span>
               </div>
+
             </div>
 
             {/* Funil de Execução */}
             <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-              <h3 className="text-lg font-bold mb-2">Funil de Execução Orçamentária</h3>
-              <p className="text-xs text-slate-500 mb-8">Etapas desde o Empenho do orçamento até o Pagamento final no exercício corrente</p>
-              <div className="h-80">
+              <h3 className="text-base font-bold mb-4">Funil Orçamentário (Empenhado → Liquidado → Pago)</h3>
+              <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <FunnelChart>
                     <Tooltip />
-                    <Funnel
-                      dataKey="value"
-                      data={dataFunil}
-                      isAnimationActive
-                    >
+                    <Funnel dataKey="value" data={dataFunil} isAnimationActive>
                       {dataFunil.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
@@ -640,48 +671,49 @@ export default function App() {
                 </ResponsiveContainer>
               </div>
             </div>
+
           </div>
         )}
 
-        {/* Matriz de Auditoria e Gargalos */}
+        {/* Matriz de Gargalos e Auditoria */}
         {currentPage === 'auditoria' && (
           <div className="space-y-8 animate-fadeIn">
             <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-              <h3 className="text-lg font-bold mb-2">Matriz de Gargalos e Indicadores de Risco</h3>
-              <p className="text-xs text-slate-500 mb-6">Lista completa de Credores com empenhos de alto risco devido a altos montantes 'A Liquidar' ou 'A Pagar'.</p>
+              <h3 className="text-base font-bold mb-1">Matriz de Auditoria e Alertas (Gargalos)</h3>
+              <p className="text-xs text-slate-500 mb-6">Detalhamento dos Credores com empenhos sob risco ou gargalo de pagamento (A Liquidar ou A Pagar elevados).</p>
               
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left">
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-800">
                       <th className="pb-3 text-xs font-semibold text-slate-400">Credor</th>
                       <th className="pb-3 text-xs font-semibold text-slate-400">Nº NE</th>
-                      <th className="pb-3 text-xs font-semibold text-slate-400">Ano</th>
+                      <th className="pb-3 text-xs font-semibold text-slate-400">Processo</th>
                       <th className="pb-3 text-xs font-semibold text-slate-400 text-right">Empenhado</th>
                       <th className="pb-3 text-xs font-semibold text-slate-400 text-right">A Liquidar</th>
                       <th className="pb-3 text-xs font-semibold text-slate-400 text-right">A Pagar</th>
-                      <th className="pb-3 text-xs font-semibold text-slate-400 text-center">Risco</th>
+                      <th className="pb-3 text-xs font-semibold text-slate-400 text-center">Alerta de Risco</th>
                     </tr>
                   </thead>
                   <tbody>
                     {dadosFiltrados.map((item, idx) => {
-                      const riscoAlto = item.A_Pagar > 50000 || item.A_Liquidar > 100000;
+                      const riscoGargalo = item.A_Pagar > 50000 || item.A_Liquidar > 100000;
                       return (
-                        <tr key={idx} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                          <td className="py-4 font-semibold text-sm truncate max-w-xs">{item.Credor}</td>
-                          <td className="py-4 text-sm">{item.Num_NE}</td>
-                          <td className="py-4 text-sm">{item.Ano_Processo}</td>
-                          <td className="py-4 text-sm text-right font-medium">{formatarMoeda(item.Emp_Acum)}</td>
-                          <td className="py-4 text-sm text-right font-medium text-amber-500">{formatarMoeda(item.A_Liquidar)}</td>
-                          <td className="py-4 text-sm text-right font-medium text-rose-500">{formatarMoeda(item.A_Pagar)}</td>
-                          <td className="py-4 text-center">
-                            {riscoAlto ? (
-                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                        <tr key={idx} className="border-b border-slate-50 dark:border-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800/20 text-xs">
+                          <td className="py-3.5 font-bold truncate max-w-xs">{item.Credor}</td>
+                          <td className="py-3.5">{item.Num_NE}</td>
+                          <td className="py-3.5">{item.Processo}</td>
+                          <td className="py-3.5 text-right font-medium">{formatarMoeda(item.Emp_Acum)}</td>
+                          <td className="py-3.5 text-right font-semibold text-amber-500">{formatarMoeda(item.A_Liquidar)}</td>
+                          <td className="py-3.5 text-right font-semibold text-rose-500">{formatarMoeda(item.A_Pagar)}</td>
+                          <td className="py-3.5 text-center">
+                            {riscoGargalo ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-300">
                                 Alto Gargalo
                               </span>
                             ) : (
-                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                                Regular
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300">
+                                Seguro
                               </span>
                             )}
                           </td>
@@ -695,21 +727,21 @@ export default function App() {
           </div>
         )}
 
-        {/* Área de Upload e Histórico */}
+        {/* Upload de Relatórios */}
         {currentPage === 'upload' && (
           <div className="space-y-8 animate-fadeIn">
-            {/* Drag and Drop Container */}
-            <div className={`p-10 rounded-2xl border-2 border-dashed ${darkMode ? 'border-slate-700 bg-slate-900/50' : 'border-slate-300 bg-white'} text-center flex flex-col items-center justify-center`}>
-              <div className="w-16 h-16 rounded-full bg-indigo-100 dark:bg-indigo-950 flex items-center justify-center text-indigo-600 mb-4">
-                <Upload size={32} />
+            
+            <div className={`p-8 rounded-2xl border-2 border-dashed ${darkMode ? 'border-slate-800 bg-slate-900/40' : 'border-slate-200 bg-white'} text-center flex flex-col items-center justify-center`}>
+              <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center text-indigo-600 mb-4 shadow-sm">
+                <Upload size={24} />
               </div>
-              <h3 className="text-xl font-bold mb-2">Carregar Relatório Orçamentário (AFI)</h3>
-              <p className="text-sm text-slate-400 mb-6 max-w-sm">
-                Arraste ou clique para enviar arquivos no formato original <span className="font-semibold text-indigo-500">.xls</span> gerados pelo sistema de orçamento.
+              <h3 className="text-base font-bold mb-1">Importar Relatório Orçamentário (AFI)</h3>
+              <p className="text-xs text-slate-400 mb-6 max-w-sm">
+                Envie arquivos no formato original <span className="font-semibold text-indigo-500">.xls</span> ou <span className="font-semibold text-indigo-500">.xlsx</span> do AFI.
               </p>
               
-              <label className="cursor-pointer px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow shadow-indigo-600/10 transition">
-                Selecionar Arquivo
+              <label className="cursor-pointer px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-md shadow-indigo-600/10">
+                Escolher Arquivo Bruto
                 <input 
                   type="file" 
                   accept=".xls,.xlsx" 
@@ -719,119 +751,121 @@ export default function App() {
               </label>
             </div>
 
-            {/* Lista de Arquivos Tratados para Download */}
+            {/* Histórico e Download do Arquivo Tratado */}
             <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-              <h3 className="text-lg font-bold mb-4">Arquivos Enviados e Histórico de Processamento</h3>
-              <div className="space-y-4">
+              <h3 className="text-base font-bold mb-4">Arquivos Processados por Pandas</h3>
+              <div className="space-y-3">
                 {arquivos.map((arq, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/30">
+                  <div key={idx} className="flex items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/30 text-xs">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 flex items-center justify-center text-emerald-600">
-                        <FileSpreadsheet size={22} />
+                      <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 flex items-center justify-center text-emerald-600">
+                        <FileSpreadsheet size={18} />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold truncate max-w-xs">{arq.nome_original}</h4>
-                        <span className="text-xs text-slate-500">
+                        <h4 className="font-bold truncate max-w-xs">{arq.nome_original}</h4>
+                        <span className="text-[10px] text-slate-500">
                           {arq.total_linhas} linhas extraídas • {arq.processado_em}
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                        Processado por Python
+                    
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                        Tratado OK
                       </span>
                       <button 
                         onClick={exportarXLS}
-                        className="p-2 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
-                        title="Baixar Planilha Tratada (.xlsx)"
+                        className="p-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+                        title="Baixar Planilha Tratada"
                       >
-                        <Download size={16} />
+                        <Download size={14} />
                       </button>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+
           </div>
         )}
 
-        {/* Gerenciamento de Usuários (Apenas Visível para o Admin Lucivaldo) */}
-        {currentPage === 'usuarios' && user.email === 'lucivaldo586@gmail.com' && (
+        {/* Gerenciamento de Usuários */}
+        {currentPage === 'usuarios' && user?.email === 'lucivaldo586@gmail.com' && (
           <div className="space-y-8 animate-fadeIn">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               
-              {/* Formulário de Cadastro */}
               <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <h3 className="text-lg font-bold mb-2">Autorizar Acesso</h3>
-                <p className="text-xs text-slate-500 mb-6">Cadastre novos e-mails para permitir login e visualização dos dados orçamentários do CETAM.</p>
+                <h3 className="text-base font-bold mb-1">Autorizar Novo Acesso</h3>
+                <p className="text-xs text-slate-500 mb-6">Apenas o administrador cadastrado pode criar novos logins.</p>
                 
                 <form onSubmit={cadastrarUsuario} className="space-y-4">
                   <div>
-                    <label className="text-xs font-semibold text-slate-400 block mb-1">Nome Completo</label>
+                    <label className="text-xs font-semibold text-slate-400 block mb-1">Nome</label>
                     <input 
                       type="text" 
                       required
                       placeholder="Ex: Lucivaldo Braga"
                       value={novoNome}
                       onChange={(e) => setNovoNome(e.target.value)}
-                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-sm ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
                     />
                   </div>
                   
                   <div>
-                    <label className="text-xs font-semibold text-slate-400 block mb-1">E-mail de Acesso</label>
+                    <label className="text-xs font-semibold text-slate-400 block mb-1">E-mail</label>
                     <input 
                       type="email" 
                       required
                       placeholder="usuario@cetam.am.gov.br"
                       value={novoEmail}
                       onChange={(e) => setNovoEmail(e.target.value)}
-                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-sm ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
                     />
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-slate-400 block mb-1">Cargo / Função</label>
+                    <label className="text-xs font-semibold text-slate-400 block mb-1">Cargo</label>
                     <select 
                       value={novoCargo}
                       onChange={(e) => setNovoCargo(e.target.value)}
-                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-sm ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white'}`}
                     >
-                      <option value="viewer">Visualizador Geral (Visualizar Gráficos)</option>
-                      <option value="admin">Administrador (Pode Fazer Upload)</option>
+                      <option value="viewer">Visualizador Geral</option>
+                      <option value="admin">Administrador</option>
                     </select>
                   </div>
 
                   <button 
                     type="submit"
-                    className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow transition"
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow transition"
                   >
-                    <Plus size={18} /> Adicionar Usuário
+                    Cadastrar
                   </button>
                 </form>
               </div>
 
-              {/* Lista de Usuários do Sistema */}
               <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm lg:col-span-2`}>
-                <h3 className="text-lg font-bold mb-4">Usuários Cadastrados</h3>
+                <h3 className="text-base font-bold mb-4">Visualizadores e Administradores</h3>
                 <div className="divide-y divide-slate-100 dark:divide-slate-800">
                   {usuariosAutorizados.map((usr, index) => (
-                    <div key={index} className="flex justify-between items-center py-3">
+                    <div key={index} className="flex justify-between items-center py-3 text-xs">
                       <div>
-                        <h4 className="text-sm font-bold">{usr.name}</h4>
-                        <span className="text-xs text-slate-500">{usr.email}</span>
+                        <h4 className="font-bold">{usr.name}</h4>
+                        <span className="text-slate-400">{usr.email}</span>
                       </div>
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${usr.role === 'admin' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'}`}>
-                        {usr.role === 'admin' ? 'Administrador' : 'Visualizador'}
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${usr.role === 'admin' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'}`}>
+                        {usr.role === 'admin' ? 'Admin' : 'Visualizador'}
                       </span>
                     </div>
                   ))}
                 </div>
               </div>
+
             </div>
           </div>
         )}
       </main>
+
     </div>
   );
 }

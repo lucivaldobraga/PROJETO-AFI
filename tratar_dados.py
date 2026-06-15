@@ -2,51 +2,54 @@ import pandas as pd
 import numpy as np
 import json
 import os
+import re
 
 def tratar_relatorio_afi(caminho_entrada, caminho_saida=None):
     """
-    Trata o arquivo orçamentário bruto (.xls ou .xlsx), limpando metadados,
-    desempilhando as linhas que vêm em pares e formatando as colunas.
-    Retorna o DataFrame tratado e opcionalmente salva em formato Excel.
+    Trata o arquivo orçamentário bruto (.xls, .xlsx ou .csv/txt exportado),
+    limpando metadados, desempilhando linhas em pares e formatando valores.
     """
     print("🔄 Iniciando o processamento do relatório...")
     
-    # 1. Carregar o arquivo Excel bruto (sem definir cabeçalho ainda)
+    # 1. Carregar o arquivo bruto
+    ext = os.path.splitext(caminho_entrada)[1].lower()
     try:
-        df = pd.read_excel(caminho_entrada, header=None)
+        if ext in ['.xls', '.xlsx']:
+            df = pd.read_excel(caminho_entrada, header=None)
+        else:
+            # Caso o usuário envie CSV/TXT delimitado
+            df = pd.read_csv(caminho_entrada, header=None, sep=None, engine='python')
     except Exception as e:
-        print(f"❌ Erro ao ler o arquivo Excel: {e}")
+        print(f"❌ Erro ao ler o arquivo: {e}")
         raise e
         
-    # 2. Limpar metadados e linhas de impressão do sistema
+    # 2. Limpar metadados e linhas de cabeçalhos
     termos_sujeira = 'GOVERNO|Unidade|Relação|Página|Gestão :|Dados Acumulados'
     df_clean = df[~df[0].astype(str).str.contains(termos_sujeira, na=False)].reset_index(drop=True)
     
-    # 3. Localizar onde começam os dados reais
+    # 3. Localizar cabeçalho e dados reais
     inicio_dados = 0
     encontrou = False
     for idx, row in df_clean.iterrows():
-        if "Número NE" in str(row[0]):
-            inicio_dados = idx + 2  # Pula a linha "Número NE" e a linha "Data Emis. NE"
+        if "Número NE" in str(row[0]) or "Data Emis" in str(row[0]):
+            inicio_dados = idx + 2
             encontrou = True
             break
             
     if not encontrou:
-        print("⚠️ Cabeçalho 'Número NE' não encontrado. Assumindo início a partir da linha 0.")
         df_dados = df_clean.copy()
     else:
         df_dados = df_clean.iloc[inicio_dados:].reset_index(drop=True)
     
+    # Garante estrutura em pares
     if len(df_dados) % 2 != 0:
         df_dados = df_dados.iloc[:-1]
         
-    # 4. Separar os blocos de linhas pares (NE, Credor, Processo) e ímpares (Datas e Valores)
     pares_raw = df_dados.iloc[0::2].reset_index(drop=True)
     impares_raw = df_dados.iloc[1::2].reset_index(drop=True)
     
-    # 5. Mapeamento das colunas baseado nas posições originais da planilha
     def obter_coluna_segura(df_origem, col_idx, default_val=""):
-        if col_idx in df_origem.columns:
+        if col_idx < len(df_origem.columns):
             return df_origem[col_idx]
         return pd.Series([default_val] * len(df_origem))
 
@@ -69,26 +72,16 @@ def tratar_relatorio_afi(caminho_entrada, caminho_saida=None):
         "A_Pagar": obter_coluna_segura(impares_raw, 29, 0)
     })
     
-    # 6. Limpeza de strings e segurança contra valores nulos
+    # Limpeza e Padronização
     df_final["Processo"] = df_final["Processo"].fillna("").astype(str).str.strip()
     df_final["Num_NE"] = df_final["Num_NE"].fillna("").astype(str).str.strip()
     df_final["Credor"] = df_final["Credor"].fillna("Sem Credor").astype(str).str.strip()
-    df_final["Data_Emis"] = df_final["Data_Emis"].fillna("").astype(str).str.strip()
-    df_final["UO"] = df_final["UO"].fillna("").astype(str).str.strip()
-    df_final["PT"] = df_final["PT"].fillna("").astype(str).str.strip()
-    df_final["Fonte"] = df_final["Fonte"].fillna("").astype(str).str.strip()
-    df_final["Natureza"] = df_final["Natureza"].fillna("").astype(str).str.strip()
     
-    # 7. Regra de Negócio: Criar a coluna 'Ano_Processo' tratando Folha de Pagamento
+    # Tratamento de Ano_Processo
     def extrair_ano(processo):
         processo_upper = str(processo).upper()
         if "FOLHA DE PAGAMENTO" in processo_upper or "FOLHA" in processo_upper:
             return "2026"
-        if len(processo) >= 4:
-            ultimos_4 = processo[-4:]
-            if ultimos_4.isdigit():
-                return ultimos_4
-        import re
         match = re.search(r'\b(20\d{2}|19\d{2})\b', processo)
         if match:
             return match.group(0)
@@ -96,7 +89,7 @@ def tratar_relatorio_afi(caminho_entrada, caminho_saida=None):
 
     df_final['Ano_Processo'] = df_final['Processo'].apply(extrair_ano)
     
-    # 8. Tratamento de colunas numéricas
+    # Limpeza de valores numéricos
     colunas_valores = [
         "Emp_Mes", "Emp_Acum", "Liq_Mes", "Liq_Acum", 
         "A_Liquidar", "Pago_Mes", "Pago_Acum", "A_Pagar"
@@ -104,9 +97,11 @@ def tratar_relatorio_afi(caminho_entrada, caminho_saida=None):
     
     for col in colunas_valores:
         if df_final[col].dtype == object:
+            # Substitui separador de milhar (.) e substitui a vírgula decimal (,)
             df_final[col] = (df_final[col]
                              .astype(str)
-                             .str.replace(r'[R\$\s\.]', '', regex=True)
+                             .str.replace(r'[R\$\s]', '', regex=True)
+                             .str.replace('.', '', regex=False)
                              .str.replace(',', '.', regex=False))
         df_final[col] = pd.to_numeric(df_final[col], errors='coerce').fillna(0.0)
         
@@ -115,13 +110,11 @@ def tratar_relatorio_afi(caminho_entrada, caminho_saida=None):
     if caminho_saida:
         try:
             df_final.to_excel(caminho_saida, index=False)
-            print(f"💾 Arquivo tratado salvo em: {caminho_saida}")
         except Exception as e:
-            print(f"❌ Erro ao salvar arquivo Excel de saída: {e}")
+            print(f"❌ Erro ao salvar arquivo: {e}")
             
     return df_final
 
 def converter_para_json(df):
     df_limpo = df.replace({np.nan: None})
-    records = df_limpo.to_dict(orientation='records')
-    return records
+    return df_limpo.to_dict(orientation='records')
