@@ -412,38 +412,13 @@ export default function App() {
   const processosDisponiveis = ['Todos', ...new Set(dados.map(item => item.Processo))].sort();
   const uoDisponiveis = ['Todos', ...new Set(dados.map(item => item.UO))].sort();
 
-  // Data de referência de Hoje (dinâmica com fallback)
+  // Data de referência de Hoje (dinâmica sem fallback)
   const dataHojeRef = (() => {
     const hojeSistema = new Date();
     const dia = String(hojeSistema.getDate()).padStart(2, '0');
     const mes = String(hojeSistema.getMonth() + 1).padStart(2, '0');
     const ano = hojeSistema.getFullYear();
-    const dataFormatada = `${dia}/${mes}/${ano}`;
-
-    const temDadosHoje = dados.some(item => item.Data_Emis === dataFormatada);
-    if (temDadosHoje) return dataFormatada;
-
-    const temDadosExemplo = dados.some(item => item.Data_Emis === '05/01/2026');
-    if (temDadosExemplo) return '05/01/2026';
-
-    if (dados.length > 0) {
-      const datasValidas = dados
-        .filter(item => item.Data_Emis && item.Data_Emis.includes('/'))
-        .map(item => {
-          const parts = item.Data_Emis.split('/');
-          return {
-            original: item.Data_Emis,
-            date: new Date(parts[2], parts[1] - 1, parts[0])
-          };
-        })
-        .filter(x => !isNaN(x.date.getTime()));
-
-      if (datasValidas.length > 0) {
-        datasValidas.sort((a, b) => b.date - a.date);
-        return datasValidas[0].original;
-      }
-    }
-    return dataFormatada;
+    return `${dia}/${mes}/${ano}`;
   })();
 
   const empenhosHoje = dadosFiltrados.filter(item => item.Data_Emis === dataHojeRef);
