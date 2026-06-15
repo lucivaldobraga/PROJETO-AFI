@@ -197,24 +197,31 @@ export const firebaseService = {
       return;
     }
     try {
-      const batch = writeBatch(db);
-      
+      // Registrar log do arquivo
       const docArqRef = doc(collection(db, 'arquivos'));
-      batch.set(docArqRef, {
+      const batchArq = writeBatch(db);
+      batchArq.set(docArqRef, {
         nome_original: nomeArquivo,
         status: 'sucesso',
         total_linhas: registros.length,
         processado_em: new Date().toLocaleString('pt-BR')
       });
+      await batchArq.commit();
       
-      for (const r of registros) {
-        const docOrcRef = doc(collection(db, 'orcamentos'));
-        batch.set(docOrcRef, {
-          ...r,
-          arquivo_origem: nomeArquivo
-        });
+      // Salvar os registros no Firestore em lotes de no máximo 400 para respeitar o limite de 500 escritas do Firestore
+      const chunk = 400;
+      for (let i = 0; i < registros.length; i += chunk) {
+        const lote = registros.slice(i, i + chunk);
+        const batch = writeBatch(db);
+        for (const r of lote) {
+          const docOrcRef = doc(collection(db, 'orcamentos'));
+          batch.set(docOrcRef, {
+            ...r,
+            arquivo_origem: nomeArquivo
+          });
+        }
+        await batch.commit();
       }
-      await batch.commit();
     } catch (e) {
       console.error("Erro ao salvar no Firestore, usando fallback local:", e);
       await mockService.adicionarRegistrosLocais(registros, nomeArquivo);

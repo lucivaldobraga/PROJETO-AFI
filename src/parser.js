@@ -16,8 +16,15 @@ export function tratarRelatorioAfi(fileBuffer) {
   let inicioDados = 0;
   let encontrou = false;
   for (let i = 0; i < dfClean.length; i++) {
-    const rowStr = String(dfClean[i][0] || "");
-    if (rowStr.includes("Número NE") || rowStr.includes("Data Emis")) {
+    const row = dfClean[i] || [];
+    const temTermoCabecalho = row.some(cell => {
+      const cellStr = String(cell || "").toLowerCase().trim();
+      return cellStr.includes("número ne") || 
+             cellStr.includes("data emis") || 
+             cellStr.includes("nº ne") || 
+             cellStr.includes("num ne");
+    });
+    if (temTermoCabecalho) {
       inicioDados = i + 2;
       encontrou = true;
       break;
