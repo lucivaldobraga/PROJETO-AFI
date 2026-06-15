@@ -27,9 +27,21 @@ export default function App() {
   const [arquivos, setArquivos] = useState([]);
   const [loadingFirebase, setLoadingFirebase] = useState(false);
   
-  const [usuariosAutorizados, setUsuariosAutorizados] = useState([
-    { email: 'lucivaldo586@gmail.com', name: 'Lucivaldo Braga', role: 'admin' }
-  ]);
+  const [usuariosAutorizados, setUsuariosAutorizados] = useState(() => {
+    const stored = localStorage.getItem('afi_usuarios');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {}
+    }
+    return [
+      { email: 'lucivaldo586@gmail.com', name: 'Lucivaldo Braga', role: 'admin', password: 'admin123' }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('afi_usuarios', JSON.stringify(usuariosAutorizados));
+  }, [usuariosAutorizados]);
 
   // Estados Globais, Filtros e Temas
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
@@ -37,18 +49,54 @@ export default function App() {
   const [busca, setBusca] = useState('');
   const [filtroAno, setFiltroAno] = useState('Todos');
 
-  // Cadastro de Novo Usuário
+  // Cadastro e Edição de Usuário
   const [novoEmail, setNovoEmail] = useState('');
   const [novoNome, setNovoNome] = useState('');
   const [novoCargo, setNovoCargo] = useState('viewer');
+  const [novaSenha, setNovaSenha] = useState('');
+  const [editingEmail, setEditingEmail] = useState(null);
 
   const cadastrarUsuario = (e) => {
     e.preventDefault();
-    if (!novoEmail || !novoNome) return;
-    setUsuariosAutorizados(prev => [...prev, { email: novoEmail, name: novoNome, role: novoCargo }]);
+    if (!novoEmail || !novoNome || !novaSenha) return;
+    
+    if (editingEmail) {
+      setUsuariosAutorizados(prev => prev.map(u => 
+        u.email === editingEmail ? { ...u, name: novoNome, email: novoEmail, password: novaSenha, role: novoCargo } : u
+      ));
+      alert(`Usuário ${novoNome} atualizado com sucesso!`);
+      setEditingEmail(null);
+    } else {
+      if (usuariosAutorizados.some(u => u.email === novoEmail)) {
+        alert("E-mail já cadastrado!");
+        return;
+      }
+      setUsuariosAutorizados(prev => [...prev, { email: novoEmail, name: novoNome, password: novaSenha, role: novoCargo }]);
+      alert(`Usuário ${novoNome} cadastrado com sucesso!`);
+    }
+    
     setNovoEmail('');
     setNovoNome('');
-    alert(`Usuário ${novoNome} autorizado com sucesso!`);
+    setNovaSenha('');
+    setNovoCargo('viewer');
+  };
+
+  const iniciarEdicao = (usr) => {
+    setEditingEmail(usr.email);
+    setNovoNome(usr.name);
+    setNovoEmail(usr.email);
+    setNovaSenha(usr.password || '123456');
+    setNovoCargo(usr.role);
+  };
+
+  const removerUsuario = (email) => {
+    if (email === 'lucivaldo586@gmail.com') {
+      alert("Não é possível remover o administrador padrão!");
+      return;
+    }
+    if (window.confirm("Deseja realmente remover o acesso deste usuário?")) {
+      setUsuariosAutorizados(prev => prev.filter(u => u.email !== email));
+    }
   };
 
   // Monitorar Autenticação do Firebase
@@ -100,15 +148,20 @@ export default function App() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError('');
+    
+    // Validar usuário na lista local/sandbox primeiro
+    const usuarioExiste = usuariosAutorizados.find(u => u.email === emailInput);
+    if (usuarioExiste && usuarioExiste.password === passwordInput) {
+      setUser(usuarioExiste);
+      setIsAuthenticated(true);
+      carregarDadosFirebase();
+      return;
+    }
+
     try {
       await firebaseService.login(emailInput, passwordInput);
     } catch (error) {
-      if (emailInput === 'lucivaldo586@gmail.com' && passwordInput === 'admin123') {
-        setUser({ email: 'lucivaldo586@gmail.com', name: 'Lucivaldo Braga', role: 'admin' });
-        setIsAuthenticated(true);
-      } else {
-        setLoginError('Credenciais incorretas.');
-      }
+      setLoginError('Credenciais incorretas ou falha de conexão.');
     }
   };
 
@@ -758,8 +811,8 @@ export default function App() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               
               <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
-                <h3 className="text-base font-bold mb-1">Autorizar Novo Acesso</h3>
-                <p className="text-xs text-slate-500 mb-6">Apenas o administrador cadastrado pode criar novos logins.</p>
+                <h3 className="text-base font-bold mb-1">{editingEmail ? 'Editar Usuário' : 'Autorizar Novo Acesso'}</h3>
+                <p className="text-xs text-slate-500 mb-6">Cadastre ou edite credenciais de acesso locais ao painel.</p>
                 
                 <form onSubmit={cadastrarUsuario} className="space-y-4">
                   <div>
@@ -787,6 +840,18 @@ export default function App() {
                   </div>
 
                   <div>
+                    <label className="text-xs font-semibold text-slate-400 block mb-1">Senha de Acesso</label>
+                    <input 
+                      type="text" 
+                      required
+                      placeholder="Senha do usuário"
+                      value={novaSenha}
+                      onChange={(e) => setNovaSenha(e.target.value)}
+                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                    />
+                  </div>
+
+                  <div>
                     <label className="text-xs font-semibold text-slate-400 block mb-1">Cargo</label>
                     <select 
                       value={novoCargo}
@@ -802,23 +867,56 @@ export default function App() {
                     type="submit"
                     className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow transition"
                   >
-                    Cadastrar
+                    {editingEmail ? 'Atualizar Usuário' : 'Cadastrar'}
                   </button>
+                  
+                  {editingEmail && (
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setEditingEmail(null);
+                        setNovoNome('');
+                        setNovoEmail('');
+                        setNovaSenha('');
+                        setNovoCargo('viewer');
+                      }}
+                      className="w-full py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition mt-2"
+                    >
+                      Cancelar Edição
+                    </button>
+                  )}
                 </form>
               </div>
 
               <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm lg:col-span-2`}>
-                <h3 className="text-base font-bold mb-4">Visualizadores e Administradores</h3>
+                <h3 className="text-base font-bold mb-4">Usuários e Credenciais do Painel</h3>
                 <div className="divide-y divide-slate-100 dark:divide-slate-800">
                   {usuariosAutorizados.map((usr, index) => (
                     <div key={index} className="flex justify-between items-center py-3 text-xs">
                       <div>
-                        <h4 className="font-bold">{usr.name}</h4>
-                        <span className="text-slate-400">{usr.email}</span>
+                        <h4 className="font-bold text-sm">{usr.name}</h4>
+                        <span className="text-slate-400 block">{usr.email}</span>
+                        <span className="text-slate-500 block">Senha: <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">{usr.password || '123456'}</code></span>
                       </div>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${usr.role === 'admin' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'}`}>
-                        {usr.role === 'admin' ? 'Admin' : 'Visualizador'}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${usr.role === 'admin' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'}`}>
+                          {usr.role === 'admin' ? 'Admin' : 'Visualizador'}
+                        </span>
+                        <button 
+                          onClick={() => iniciarEdicao(usr)}
+                          className="px-2 py-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 rounded text-[10px] font-semibold"
+                        >
+                          Editar
+                        </button>
+                        {usr.email !== 'lucivaldo586@gmail.com' && (
+                          <button 
+                            onClick={() => removerUsuario(usr.email)}
+                            className="px-2 py-1 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 text-rose-600 dark:text-rose-450 rounded text-[10px] font-semibold"
+                          >
+                            Remover
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
