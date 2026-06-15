@@ -81,6 +81,10 @@ export function tratarRelatorioAfi(fileBuffer) {
       }
     }
     
+    if (anoProcesso === "0004" || anoProcesso === "Sem Ano") {
+      anoProcesso = "2026";
+    }
+    
     if (numNe && numNe !== "undefined") {
       records.push({
         Num_NE: numNe,

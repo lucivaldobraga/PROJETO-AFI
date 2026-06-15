@@ -5,14 +5,134 @@ import {
 } from 'recharts';
 import { 
   LayoutDashboard, TrendingUp, AlertTriangle, Upload, Users, LogOut, Sun, Moon, Search, 
-  Download, FileSpreadsheet, Plus, ShieldCheck, FileDown, AlertCircle, RefreshCw, Trash2
+  Download, FileSpreadsheet, Plus, ShieldCheck, FileDown, AlertCircle, RefreshCw, Trash2,
+  ChevronDown, X
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 import { firebaseService } from './firebase';
 import { tratarRelatorioAfi } from './parser';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#d946ef', '#ec4899', '#f43f5e', '#3b82f6', '#06b6d4', '#10b981'];
+
+function SearchableDropdown({ label, value, onChange, options, placeholder, darkMode }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const dropdownRef = React.useRef(null);
+
+  useEffect(() => {
+    if (value === 'Todos') {
+      setSearchTerm('');
+    } else {
+      setSearchTerm(value || '');
+    }
+  }, [value, isOpen]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const filteredOptions = React.useMemo(() => {
+    const cleanTerm = searchTerm.toLowerCase().trim();
+    const baseOptions = options.filter(opt => opt && opt !== 'Todos');
+    
+    let matches = baseOptions;
+    if (cleanTerm) {
+      matches = baseOptions.filter(opt => 
+        String(opt).toLowerCase().includes(cleanTerm)
+      );
+    }
+    
+    return ['Todos', ...matches.slice(0, 100)];
+  }, [options, searchTerm]);
+
+  const handleInputChange = (e) => {
+    const newVal = e.target.value;
+    setSearchTerm(newVal);
+    setIsOpen(true);
+    if (newVal.trim() === '') {
+      onChange('Todos');
+    } else {
+      onChange(newVal);
+    }
+  };
+
+  const handleSelectOption = (opt) => {
+    onChange(opt);
+    setSearchTerm(opt === 'Todos' ? '' : opt);
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="relative w-full text-left" ref={dropdownRef}>
+      <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">{label}</label>
+      <div className="relative">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={handleInputChange}
+          onFocus={() => setIsOpen(true)}
+          placeholder={placeholder || "Pesquisar..."}
+          className={`w-full pl-3 pr-8 py-2 rounded-xl border outline-none text-xs transition ${
+            darkMode 
+              ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500 placeholder-slate-600' 
+              : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-indigo-500 placeholder-slate-400'
+          }`}
+        />
+        <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5">
+          {searchTerm && (
+            <button 
+              type="button" 
+              onClick={() => handleSelectOption('Todos')}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+            >
+              <X size={12} />
+            </button>
+          )}
+          <ChevronDown 
+            size={14} 
+            className={`text-slate-400 transition-transform cursor-pointer ${isOpen ? 'rotate-180' : ''}`}
+            onClick={() => setIsOpen(!isOpen)}
+          />
+        </div>
+      </div>
+
+      {isOpen && (
+        <ul className={`absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border shadow-lg text-xs ${
+          darkMode 
+            ? 'bg-slate-950 border-slate-800 text-white divide-y divide-slate-850' 
+            : 'bg-white border-slate-200 text-slate-800 divide-y divide-slate-105'
+        }`}>
+          {filteredOptions.length === 0 ? (
+            <li className="px-3 py-2 text-slate-400 italic">Nenhum resultado</li>
+          ) : (
+            filteredOptions.map((opt) => (
+              <li
+                key={opt}
+                onClick={() => handleSelectOption(opt)}
+                className={`px-3 py-2 cursor-pointer transition-colors break-words ${
+                  value === opt
+                    ? (darkMode ? 'bg-indigo-600/30 text-indigo-400 font-semibold' : 'bg-indigo-50 text-indigo-600 font-semibold')
+                    : (darkMode ? 'hover:bg-slate-900 text-slate-200' : 'hover:bg-slate-50 text-slate-700')
+                }`}
+              >
+                {opt === 'Todos' ? 'Todos' : opt}
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   // Controle de Autenticação
@@ -48,12 +168,51 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [busca, setBusca] = useState('');
   const [filtroAno, setFiltroAno] = useState('Todos');
+  const [filtroCredor, setFiltroCredor] = useState('Todos');
+  const [filtroNE, setFiltroNE] = useState('Todos');
+  const [filtroProcesso, setFiltroProcesso] = useState('Todos');
+  const [filtroUO, setFiltroUO] = useState('Todos');
+  const [menuMobileAberto, setMenuMobileAberto] = useState(false);
+  const [buscaAuditoriaCredor, setBuscaAuditoriaCredor] = useState('');
+  const [buscaAuditoriaNE, setBuscaAuditoriaNE] = useState('');
+  const [filtroAuditoriaStatus, setFiltroAuditoriaStatus] = useState('Todos');
+  const [exportandoPDF, setExportandoPDF] = useState(false);
+
+  // Modal de Alertas Customizado
+  const [alertModal, setAlertModal] = useState({
+    show: false,
+    title: '',
+    message: '',
+    type: 'info', // 'success', 'error', 'warning', 'info', 'confirm'
+    onConfirm: null
+  });
+
+  const customAlert = (title, message, type = 'info') => {
+    setAlertModal({
+      show: true,
+      title,
+      message,
+      type,
+      onConfirm: null
+    });
+  };
+
+  const customConfirm = (title, message, onConfirm) => {
+    setAlertModal({
+      show: true,
+      title,
+      message,
+      type: 'confirm',
+      onConfirm
+    });
+  };
 
   // Cadastro e Edição de Usuário
   const [novoEmail, setNovoEmail] = useState('');
   const [novoNome, setNovoNome] = useState('');
   const [novoCargo, setNovoCargo] = useState('viewer');
   const [novaSenha, setNovaSenha] = useState('');
+  const [novoSetor, setNovoSetor] = useState('');
   const [editingEmail, setEditingEmail] = useState(null);
 
   const cadastrarUsuario = (e) => {
@@ -62,23 +221,24 @@ export default function App() {
     
     if (editingEmail) {
       setUsuariosAutorizados(prev => prev.map(u => 
-        u.email === editingEmail ? { ...u, name: novoNome, email: novoEmail, password: novaSenha, role: novoCargo } : u
+        u.email === editingEmail ? { ...u, name: novoNome, email: novoEmail, password: novaSenha, role: novoCargo, setor: novoSetor } : u
       ));
-      alert(`Usuário ${novoNome} atualizado com sucesso!`);
+      customAlert("Sucesso", `Usuário ${novoNome} atualizado com sucesso!`, "success");
       setEditingEmail(null);
     } else {
       if (usuariosAutorizados.some(u => u.email === novoEmail)) {
-        alert("E-mail já cadastrado!");
+        customAlert("Aviso", "E-mail já cadastrado!", "warning");
         return;
       }
-      setUsuariosAutorizados(prev => [...prev, { email: novoEmail, name: novoNome, password: novaSenha, role: novoCargo }]);
-      alert(`Usuário ${novoNome} cadastrado com sucesso!`);
+      setUsuariosAutorizados(prev => [...prev, { email: novoEmail, name: novoNome, password: novaSenha, role: novoCargo, setor: novoSetor }]);
+      customAlert("Sucesso", `Usuário ${novoNome} cadastrado com sucesso!`, "success");
     }
     
     setNovoEmail('');
     setNovoNome('');
     setNovaSenha('');
     setNovoCargo('viewer');
+    setNovoSetor('');
   };
 
   const iniciarEdicao = (usr) => {
@@ -87,26 +247,32 @@ export default function App() {
     setNovoEmail(usr.email);
     setNovaSenha(usr.password || '123456');
     setNovoCargo(usr.role);
+    setNovoSetor(usr.setor || '');
   };
 
   const removerUsuario = (email) => {
     if (email === 'lucivaldo586@gmail.com') {
-      alert("Não é possível remover o administrador padrão!");
+      customAlert("Aviso", "Não é possível remover o administrador padrão!", "warning");
       return;
     }
-    if (window.confirm("Deseja realmente remover o acesso deste usuário?")) {
-      setUsuariosAutorizados(prev => prev.filter(u => u.email !== email));
-    }
+    customConfirm(
+      "Remover Usuário", 
+      `Deseja realmente remover o acesso do usuário ${email}?`, 
+      () => {
+        setUsuariosAutorizados(prev => prev.filter(u => u.email !== email));
+      }
+    );
   };
 
   // Monitorar Autenticação do Firebase
   useEffect(() => {
     const unsubscribe = firebaseService.onAuthChange((currentUser) => {
       if (currentUser) {
+        const dadosLocais = usuariosAutorizados.find(u => u.email.toLowerCase() === currentUser.email.toLowerCase());
         setUser({
           email: currentUser.email,
-          name: currentUser.displayName || currentUser.email.split('@')[0],
-          role: currentUser.email === 'lucivaldo586@gmail.com' ? 'admin' : 'viewer'
+          name: dadosLocais ? dadosLocais.name : (currentUser.displayName || currentUser.email.split('@')[0]),
+          role: currentUser.email === 'lucivaldo586@gmail.com' ? 'admin' : (dadosLocais ? dadosLocais.role : 'viewer')
         });
         setIsAuthenticated(true);
         carregarDadosFirebase();
@@ -116,7 +282,7 @@ export default function App() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [usuariosAutorizados]);
 
   // Buscar dados reais do Firestore
   const carregarDadosFirebase = async () => {
@@ -189,17 +355,17 @@ export default function App() {
           const registros = tratarRelatorioAfi(fileBuffer);
           
           if (registros.length === 0) {
-            alert("Nenhum registro encontrado ou formato de planilha inválido.");
+            customAlert("Erro", "Nenhum registro encontrado ou formato de planilha inválido.", "error");
             setLoadingFirebase(false);
             return;
           }
           
           await firebaseService.adicionarRegistros(registros, file.name);
-          alert(`Planilha processada com sucesso! ${registros.length} empenhos importados.`);
+          customAlert("Sucesso", `Planilha processada com sucesso! ${registros.length} empenhos importados.`, "success");
           await carregarDadosFirebase();
         } catch (err) {
           console.error(err);
-          alert("Erro ao processar planilha: " + err.message);
+          customAlert("Erro", "Erro ao processar planilha: " + err.message, "error");
           setLoadingFirebase(false);
         }
       };
@@ -211,16 +377,21 @@ export default function App() {
   };
 
   const handleDeletarArquivo = async (nomeOriginal) => {
-    if (!window.confirm(`Tem certeza que deseja remover o arquivo?`)) return;
-    setLoadingFirebase(true);
-    try {
-      await firebaseService.removerArquivo(nomeOriginal);
-    } catch (err) {
-      console.warn("Removendo localmente.");
-    }
-    setArquivos(prev => prev.filter(a => a.nome_original !== nomeOriginal));
-    setDados(prev => prev.filter(d => d.arquivo_origem !== nomeOriginal));
-    setLoadingFirebase(false);
+    customConfirm(
+      "Remover Arquivo", 
+      `Tem certeza que deseja remover o arquivo "${nomeOriginal}" e todos os seus empenhos do sistema?`,
+      async () => {
+        setLoadingFirebase(true);
+        try {
+          await firebaseService.removerArquivo(nomeOriginal);
+        } catch (err) {
+          console.warn("Removendo localmente.");
+        }
+        setArquivos(prev => prev.filter(a => a.nome_original !== nomeOriginal));
+        setDados(prev => prev.filter(d => d.arquivo_origem !== nomeOriginal));
+        setLoadingFirebase(false);
+      }
+    );
   };
 
   // Filtragem dos dados reais
@@ -234,10 +405,63 @@ export default function App() {
       item.UO.toLowerCase().includes(termo);
 
     const bateAno = filtroAno === 'Todos' || item.Ano_Processo === filtroAno;
-    return bateBusca && bateAno;
+    const bateCredor = filtroCredor === 'Todos' || !filtroCredor || item.Credor.toLowerCase().includes(filtroCredor.toLowerCase());
+    const bateNE = filtroNE === 'Todos' || !filtroNE || item.Num_NE.toLowerCase().includes(filtroNE.toLowerCase());
+    const bateProcesso = filtroProcesso === 'Todos' || !filtroProcesso || item.Processo.toLowerCase().includes(filtroProcesso.toLowerCase());
+    const bateUO = filtroUO === 'Todos' || !filtroUO || item.UO.toLowerCase().includes(filtroUO.toLowerCase());
+
+    return bateBusca && bateAno && bateCredor && bateNE && bateProcesso && bateUO;
   });
 
-  const anosDisponiveis = ['Todos', ...new Set(dados.map(item => item.Ano_Processo))];
+  const anosDisponiveis = ['Todos', ...new Set(dados.map(item => item.Ano_Processo))].sort();
+  const credoresDisponiveis = ['Todos', ...new Set(dados.map(item => item.Credor))].sort();
+  const neDisponiveis = ['Todos', ...new Set(dados.map(item => item.Num_NE))].sort();
+  const processosDisponiveis = ['Todos', ...new Set(dados.map(item => item.Processo))].sort();
+  const uoDisponiveis = ['Todos', ...new Set(dados.map(item => item.UO))].sort();
+
+  // Data de referência de Hoje (dinâmica com fallback)
+  const dataHojeRef = (() => {
+    const hojeSistema = new Date();
+    const dia = String(hojeSistema.getDate()).padStart(2, '0');
+    const mes = String(hojeSistema.getMonth() + 1).padStart(2, '0');
+    const ano = hojeSistema.getFullYear();
+    const dataFormatada = `${dia}/${mes}/${ano}`;
+    
+    const temDadosHoje = dados.some(item => item.Data_Emis === dataFormatada);
+    if (temDadosHoje) return dataFormatada;
+    
+    const temDadosExemplo = dados.some(item => item.Data_Emis === '05/01/2026');
+    if (temDadosExemplo) return '05/01/2026';
+    
+    if (dados.length > 0) {
+      const datasValidas = dados
+        .filter(item => item.Data_Emis && item.Data_Emis.includes('/'))
+        .map(item => {
+          const parts = item.Data_Emis.split('/');
+          return {
+            original: item.Data_Emis,
+            date: new Date(parts[2], parts[1] - 1, parts[0])
+          };
+        })
+        .filter(x => !isNaN(x.date.getTime()));
+      
+      if (datasValidas.length > 0) {
+        datasValidas.sort((a, b) => b.date - a.date);
+        return datasValidas[0].original;
+      }
+    }
+    return dataFormatada;
+  })();
+
+  const empenhosHoje = dadosFiltrados.filter(item => item.Data_Emis === dataHojeRef);
+  const valorHoje = empenhosHoje.reduce((sum, item) => sum + item.Pago_Acum, 0);
+  const empenhadoHojeTotal = empenhosHoje.reduce((sum, item) => sum + item.Emp_Acum, 0);
+  const aPagarHojeTotal = empenhosHoje.reduce((sum, item) => sum + item.A_Pagar, 0);
+  const aLiquidarHojeTotal = empenhosHoje.reduce((sum, item) => sum + item.A_Liquidar, 0);
+
+  // Identificar empenhos sob risco para avisos visuais
+  const empenhosRisco = dadosFiltrados.filter(item => item.A_Pagar > 100000 || item.A_Liquidar > 200000);
+  const totalRiscoValor = empenhosRisco.reduce((sum, item) => sum + item.A_Pagar + item.A_Liquidar, 0);
 
   // Cálculos de KPIs
   const totais = dadosFiltrados.reduce((acc, curr) => {
@@ -256,8 +480,6 @@ export default function App() {
   });
 
   const percentualExecucao = totais.empAcum > 0 ? (totais.pagoAcum / totais.empAcum) * 100 : 0;
-  const empenhosHoje = dadosFiltrados.filter(item => item.Data_Emis === '05/01/2026');
-  const valorHoje = empenhosHoje.reduce((sum, item) => sum + item.Pago_Acum, 0);
 
   // Formatação monetária premium (BRL)
   const formatarMoeda = (valor) => {
@@ -274,14 +496,44 @@ export default function App() {
 
   const exportarPDF = () => {
     const input = document.getElementById('dashboard-view');
-    html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-      pdf.save(`relatorio_orcamentario_${currentPage}.pdf`);
-    });
+    document.body.classList.add('exporting-pdf');
+    setExportandoPDF(true);
+    
+    // Pequeno atraso para a interface ocultar os botões/filtros
+    setTimeout(() => {
+      html2canvas(input, { 
+        scale: 2, 
+        useCORS: true,
+        backgroundColor: darkMode ? '#020617' : '#f8fafc'
+      }).then((canvas) => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const imgWidth = 210;
+        const pageHeight = 297;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        let heightLeft = imgHeight;
+        let position = 0;
+
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+
+        while (heightLeft >= 0) {
+          position = heightLeft - imgHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+        }
+
+        pdf.save(`relatorio_orcamentario_${currentPage}.pdf`);
+        document.body.classList.remove('exporting-pdf');
+        setExportandoPDF(false);
+      }).catch(err => {
+        console.error("Erro ao gerar PDF:", err);
+        document.body.classList.remove('exporting-pdf');
+        setExportandoPDF(false);
+        customAlert("Erro de Exportação", "Não foi possível gerar o PDF. Verifique o console.", "error");
+      });
+    }, 150);
   };
 
   const exportarXLS = () => {
@@ -310,16 +562,28 @@ export default function App() {
     { name: 'Jun', Empenhado: totais.empAcum, Pago: totais.pagoAcum }
   ];
 
-  const despesasPorNatureza = dadosFiltrados.reduce((acc, item) => {
-    const nat = item.Natureza.split(' - ')[0];
-    const existente = acc.find(x => x.name === nat);
-    if (existente) {
-      existente.value += item.Emp_Acum;
-    } else {
-      acc.push({ name: nat, value: item.Emp_Acum });
+  const despesasPorNatureza = (() => {
+    const raw = dadosFiltrados.reduce((acc, item) => {
+      const nat = item.Natureza.split(' - ')[0];
+      const existente = acc.find(x => x.name === nat);
+      if (existente) {
+        existente.value += item.Emp_Acum;
+      } else {
+        acc.push({ name: nat, value: item.Emp_Acum });
+      }
+      return acc;
+    }, []);
+
+    raw.sort((a, b) => b.value - a.value);
+
+    if (raw.length > 6) {
+      const top = raw.slice(0, 5);
+      const rest = raw.slice(5);
+      const restTotal = rest.reduce((sum, x) => sum + x.value, 0);
+      return [...top, { name: 'Outras Naturezas', value: restTotal }];
     }
-    return acc;
-  }, []);
+    return raw;
+  })();
 
   const totalPorAno = dadosFiltrados.reduce((acc, item) => {
     const ano = item.Ano_Processo;
@@ -336,7 +600,28 @@ export default function App() {
   const maioresCredores = [...dadosFiltrados]
     .sort((a, b) => b.Emp_Acum - a.Emp_Acum)
     .slice(0, 5)
-    .map(x => ({ name: x.Credor.substring(0, 15) + '...', Empenhado: x.Emp_Acum, Pago: x.Pago_Acum }));
+    .map(x => ({ name: x.Credor, Empenhado: x.Emp_Acum, Pago: x.Pago_Acum }));
+
+  const chartDadosHoje = empenhosHoje
+    .sort((a, b) => b.Emp_Acum - a.Emp_Acum)
+    .slice(0, 5)
+    .map(x => ({
+      name: x.Credor,
+      Empenhado: x.Emp_Acum,
+      Pago: x.Pago_Acum
+    }));
+
+  const despesasPorUO = dadosFiltrados.reduce((acc, item) => {
+    const uo = item.UO || "Sem UO";
+    const existente = acc.find(x => x.name === uo);
+    if (existente) {
+      existente.Empenhado += item.Emp_Acum;
+      existente.Pago += item.Pago_Acum;
+    } else {
+      acc.push({ name: uo.length > 15 ? uo.substring(0, 15) + '...' : uo, Empenhado: item.Emp_Acum, Pago: item.Pago_Acum });
+    }
+    return acc;
+  }, []).sort((a, b) => b.Empenhado - a.Empenhado).slice(0, 5);
 
   const dataFunil = [
     { value: totais.empAcum, name: 'Empenhado', fill: '#6366f1' },
@@ -349,9 +634,11 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100">
         <div className="w-full max-w-md p-8 rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl shadow-indigo-500/5">
           <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-extrabold text-2xl shadow-xl shadow-indigo-600/20 mb-3">
-              AFI
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="Logo CETAM" 
+              className="w-16 h-16 rounded-2xl object-contain shadow-xl shadow-indigo-600/10 mb-3"
+            />
             <h2 className="text-2xl font-bold tracking-tight">Painel AFI Orçamentos</h2>
           </div>
 
@@ -399,15 +686,17 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen flex transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+    <div className={`min-h-screen flex transition-colors duration-300 ${darkMode ? 'custom-bg-dark text-slate-100' : 'custom-bg-light text-slate-800'}`}>
       
       {/* Sidebar Fixo Lateral */}
-      <aside className={`w-72 flex-shrink-0 border-r ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'} p-6 flex flex-col justify-between`}>
+      <aside className={`w-72 flex-shrink-0 border-r ${darkMode ? 'custom-sidebar-dark text-slate-200' : 'custom-sidebar-light text-slate-800'} p-6 flex flex-col justify-between`}>
         <div>
           <div className="flex items-center gap-3 mb-10">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-600/20">
-              AFI
-            </div>
+            <img 
+              src="/logo.png" 
+              alt="Logo CETAM" 
+              className="w-10 h-10 rounded-xl object-contain shadow-md"
+            />
             <div>
               <h1 className="font-bold text-base leading-none">CETAM</h1>
               <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Orçamento</span>
@@ -439,6 +728,14 @@ export default function App() {
             >
               <Upload size={18} /> Upload e Histórico
             </button>
+            {user?.email === 'lucivaldo586@gmail.com' && (
+              <button 
+                onClick={() => setCurrentPage('usuarios')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'usuarios' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
+              >
+                <Users size={18} /> Gerenciar Usuários
+              </button>
+            )}
           </nav>
         </div>
 
@@ -490,14 +787,16 @@ export default function App() {
             <span className="text-xs font-bold text-slate-400 tracking-widest uppercase">CETAM - Amazonas</span>
             <h2 className="text-3xl font-extrabold tracking-tight">Painel de Execução AFI</h2>
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={exportarPDF} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow transition"><FileDown size={16} /> Exportar PDF</button>
-            <button onClick={exportarXLS} className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-sm font-semibold shadow transition"><Download size={16} /> Exportar Excel</button>
+          <div className="flex items-center gap-3 w-full sm:w-auto hide-in-pdf">
+            {!exportandoPDF && (
+              <button onClick={exportarPDF} className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold shadow transition"><FileDown size={16} /> Exportar PDF</button>
+            )}
+            <button onClick={exportarXLS} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold shadow transition"><Download size={16} /> Exportar Excel</button>
           </div>
         </header>
 
-        {dados.length === 0 && currentPage !== 'upload' ? (
-          <div className={`p-10 rounded-2xl border text-center flex flex-col items-center justify-center ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+        {dados.length === 0 && currentPage !== 'upload' && currentPage !== 'usuarios' ? (
+          <div className={`p-10 rounded-2xl border text-center flex flex-col items-center justify-center ${darkMode ? 'custom-card-dark' : 'custom-card-light'}`}>
             <AlertCircle size={40} className="text-amber-500 mb-3" />
             <h3 className="text-lg font-bold mb-1">Nenhum dado orçamentário real ativo</h3>
             <p className="text-xs text-slate-400 mb-6 max-w-sm">Para visualizar gráficos e KPIs, faça o upload da planilha do AFI.</p>
@@ -509,77 +808,246 @@ export default function App() {
             {currentPage === 'dashboard' && (
               <div className="space-y-8 animate-fadeIn">
                 
-                <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm flex flex-col md:flex-row gap-4`}>
-                  <div className="flex-1 relative">
+                <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm space-y-4`}>
+                  {/* Busca Geral */}
+                  <div className="relative">
                     <Search className="absolute left-4 top-3 text-slate-400" size={16} />
                     <input 
                       type="text" 
-                      placeholder="Filtrar por Credor, NE, Processo, UO..." 
+                      placeholder="Pesquisa geral em Credor, NE, Processo, Natureza ou UO..." 
                       value={busca}
                       onChange={(e) => setBusca(e.target.value)}
-                      className={`w-full pl-11 pr-4 py-2.5 rounded-xl border outline-none text-sm transition ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
+                      className={`w-full pl-11 pr-4 py-2.5 rounded-xl border outline-none text-sm transition ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500 placeholder-slate-600' : 'bg-slate-50 border-slate-200 focus:border-indigo-500 placeholder-slate-400'}`}
                     />
                   </div>
 
-                  <div className="w-full md:w-48">
-                    <select 
-                      value={filtroAno} 
-                      onChange={(e) => setFiltroAno(e.target.value)}
-                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-sm ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
-                    >
-                      {anosDisponiveis.map(ano => <option key={ano} value={ano}>Exercício: {ano}</option>)}
-                    </select>
+                  {/* Grid de 5 Filtros Específicos */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+                    {/* Exercício */}
+                    <div className="flex flex-col text-left">
+                      <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Exercício</label>
+                      <select 
+                        value={filtroAno} 
+                        onChange={(e) => setFiltroAno(e.target.value)}
+                        className={`w-full px-3 py-2 rounded-xl border outline-none text-xs transition ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
+                      >
+                        {anosDisponiveis.map(ano => <option key={ano} value={ano}>{ano === 'Todos' ? 'Todos os Anos' : ano}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Credor */}
+                    <SearchableDropdown
+                      label="Credor"
+                      value={filtroCredor}
+                      onChange={setFiltroCredor}
+                      options={credoresDisponiveis}
+                      placeholder="Todos os Credores"
+                      darkMode={darkMode}
+                    />
+
+                    {/* NE */}
+                    <SearchableDropdown
+                      label="Número da NE"
+                      value={filtroNE}
+                      onChange={setFiltroNE}
+                      options={neDisponiveis}
+                      placeholder="Todas as NEs"
+                      darkMode={darkMode}
+                    />
+
+                    {/* Processo */}
+                    <SearchableDropdown
+                      label="Processo"
+                      value={filtroProcesso}
+                      onChange={setFiltroProcesso}
+                      options={processosDisponiveis}
+                      placeholder="Todos os Processos"
+                      darkMode={darkMode}
+                    />
+
+                    {/* UO */}
+                    <SearchableDropdown
+                      label="Unidade (UO)"
+                      value={filtroUO}
+                      onChange={setFiltroUO}
+                      options={uoDisponiveis}
+                      placeholder="Todas as UOs"
+                      darkMode={darkMode}
+                    />
                   </div>
                 </div>
 
                 {/* KPIs */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <span className="text-xs font-semibold text-slate-400">Empenhado no Mês</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.empMes)}</p>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <span className="text-xs font-semibold text-slate-400">Empenhado Mês (Acumulado)</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1 text-indigo-500">{formatarMoeda(totais.empAcum)}</p>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <span className="text-xs font-semibold text-slate-400">Liquidado no Mês</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.liqMes)}</p>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <span className="text-xs font-semibold text-slate-400">Liquidado Mês (Acumulado)</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1 text-purple-500">{formatarMoeda(totais.liqAcum)}</p>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <span className="text-xs font-semibold text-slate-400">A Liquidar</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1 text-amber-500">{formatarMoeda(totais.aLiquidar)}</p>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <span className="text-xs font-semibold text-slate-400">Pago no Mês</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.pagoMes)}</p>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <span className="text-xs font-semibold text-slate-400">Pago Mês (Acumulado)</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1 text-emerald-500">{formatarMoeda(totais.pagoAcum)}</p>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <span className="text-xs font-semibold text-slate-400">A Pagar</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1 text-rose-500">{formatarMoeda(totais.aPagar)}</p>
                   </div>
                 </div>
 
-                {/* Graficos */}
+                {/* Seção Operações de Hoje (No Topo dos Gráficos) */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Card: Agendado para Hoje */}
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col justify-between`}>
+                    <div>
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-base font-extrabold tracking-tight">Agendado para Hoje</h3>
+                        <span className="px-2 py-1 bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 rounded-lg text-[10px] font-bold">
+                          Ref: {dataHojeRef}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mb-6">Detalhamento dos valores liberados e empenhados na data atual de processamento.</p>
+                      
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+                          <span className="text-xs text-slate-400">Total Pago Hoje</span>
+                          <span className="text-sm font-extrabold text-emerald-500">{formatarMoeda(valorHoje)}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+                          <span className="text-xs text-slate-400">Total Empenhado</span>
+                          <span className="text-sm font-extrabold text-indigo-500">{formatarMoeda(empenhadoHojeTotal)}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+                          <span className="text-xs text-slate-400">A Liquidar</span>
+                          <span className="text-sm font-semibold text-amber-500">{formatarMoeda(aLiquidarHojeTotal)}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2">
+                          <span className="text-xs text-slate-400">A Pagar</span>
+                          <span className="text-sm font-semibold text-rose-500">{formatarMoeda(aPagarHojeTotal)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-6 mt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                      <span className="text-xs text-slate-400 font-semibold">Qtd. Empenhos</span>
+                      <span className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-[10px] font-bold">
+                        {empenhosHoje.length} registros
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Gráfico: Empenhos para a Data de Hoje */}
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm lg:col-span-2`}>
+                    <h3 className="text-base font-extrabold tracking-tight mb-4">Empenhos para a Data de Hoje (Top 5 Credores)</h3>
+                    <div className="h-64" style={{ minHeight: '250px', minWidth: '0' }}>
+                      {empenhosHoje.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartDadosHoje} layout="vertical">
+                            <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#1e293b" : "#e2e8f0"} />
+                            <XAxis type="number" tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
+                            <YAxis dataKey="name" type="category" stroke={darkMode ? "#94a3b8" : "#64748b"} width={170} style={{ fontSize: '9px', fontFamily: 'Outfit, sans-serif' }} />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
+                                borderColor: darkMode ? '#1e293b' : '#e2e8f0',
+                                borderRadius: '12px',
+                                fontFamily: 'Outfit, sans-serif',
+                                fontSize: '11px',
+                                color: darkMode ? '#f8fafc' : '#0f172a'
+                              }}
+                              formatter={(value) => [formatarMoeda(value), '']} 
+                            />
+                            <Legend wrapperStyle={{ fontFamily: 'Outfit, sans-serif', fontSize: '10px' }} />
+                            <Bar dataKey="Empenhado" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="Pago" fill="#10b981" radius={[0, 4, 4, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                          Nenhuma movimentação para esta data.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tabela de Empenhos de Hoje */}
+                  <div className={`p-6 rounded-2xl border lg:col-span-3 ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-base font-extrabold tracking-tight">Detalhamento dos Empenhos do Dia</h3>
+                      <span className="text-[10px] text-slate-400 font-semibold">Movimentações de Hoje ({dataHojeRef})</span>
+                    </div>
+                    
+                    <div className="overflow-x-auto max-h-60 overflow-y-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-slate-100 dark:border-slate-800">
+                            <th className="py-2 text-[10px] uppercase font-bold text-slate-400">Credor</th>
+                            <th className="py-2 text-[10px] uppercase font-bold text-slate-400">Num NE</th>
+                            <th className="py-2 text-[10px] uppercase font-bold text-slate-400 text-right">Empenhado</th>
+                            <th className="py-2 text-[10px] uppercase font-bold text-slate-400 text-right">Pago</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {empenhosHoje.length > 0 ? (
+                            empenhosHoje.map((item, idx) => (
+                              <tr key={idx} className="border-b border-slate-100 dark:border-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800/10 text-xs">
+                                <td className="py-2.5 font-semibold truncate max-w-xs">{item.Credor}</td>
+                                <td className="py-2.5 text-slate-500 font-mono">{item.Num_NE}</td>
+                                <td className="py-2.5 font-bold text-right text-indigo-500">{formatarMoeda(item.Emp_Acum)}</td>
+                                <td className="py-2.5 font-bold text-right text-emerald-500">{formatarMoeda(item.Pago_Acum)}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="4" className="py-8 text-center text-xs text-slate-400">Nenhum registro para hoje.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Graficos Gerais (Abaixo da Seção de Hoje) */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <h3 className="text-base font-bold mb-4">Evolução Mensal (Empenhado vs Pago)</h3>
                     <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={dataEvolucaoMensal}>
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
-                          <XAxis dataKey="name" stroke={darkMode ? "#94a3b8" : "#64748b"} />
-                          <YAxis tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} />
-                          <Tooltip formatter={(value) => [formatarMoeda(value), '']} />
-                          <Legend />
+                          <XAxis dataKey="name" stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
+                          <YAxis tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
+                              borderColor: darkMode ? '#1e293b' : '#e2e8f0',
+                              borderRadius: '12px',
+                              fontFamily: 'Outfit, sans-serif',
+                              fontSize: '11px',
+                              color: darkMode ? '#f8fafc' : '#0f172a'
+                            }}
+                            formatter={(value) => [formatarMoeda(value), '']} 
+                          />
+                          <Legend wrapperStyle={{ fontFamily: 'Outfit, sans-serif', fontSize: '11px' }} />
                           <Line type="monotone" dataKey="Empenhado" stroke="#6366f1" strokeWidth={3} />
                           <Line type="monotone" dataKey="Pago" stroke="#10b981" strokeWidth={3} />
                         </LineChart>
@@ -587,16 +1055,26 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <h3 className="text-base font-bold mb-4">Total Pago vs Empenhado por Exercício</h3>
                     <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={totalPorAno}>
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
-                          <XAxis dataKey="ano" stroke={darkMode ? "#94a3b8" : "#64748b"} />
-                          <YAxis tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} />
-                          <Tooltip formatter={(value) => [formatarMoeda(value), '']} />
-                          <Legend />
+                          <XAxis dataKey="ano" stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
+                          <YAxis tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
+                              borderColor: darkMode ? '#1e293b' : '#e2e8f0',
+                              borderRadius: '12px',
+                              fontFamily: 'Outfit, sans-serif',
+                              fontSize: '11px',
+                              color: darkMode ? '#f8fafc' : '#0f172a'
+                            }}
+                            formatter={(value) => [formatarMoeda(value), '']} 
+                          />
+                          <Legend wrapperStyle={{ fontFamily: 'Outfit, sans-serif', fontSize: '11px' }} />
                           <Bar dataKey="Empenhado" fill="#6366f1" radius={[4, 4, 0, 0]} />
                           <Bar dataKey="Pago" fill="#10b981" radius={[4, 4, 0, 0]} />
                         </BarChart>
@@ -606,56 +1084,55 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <h3 className="text-base font-bold mb-4">Maiores Orçamentos (Top 5 Credores)</h3>
                     <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }}>
-                      <ResponsiveContainer width="100%" height="105%">
+                      <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={maioresCredores} layout="vertical">
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
-                          <XAxis type="number" tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} />
-                          <YAxis dataKey="name" type="category" stroke={darkMode ? "#94a3b8" : "#64748b"} width={100} />
-                          <Tooltip formatter={(value) => [formatarMoeda(value), '']} />
+                          <XAxis type="number" tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
+                          <YAxis dataKey="name" type="category" stroke={darkMode ? "#94a3b8" : "#64748b"} width={170} style={{ fontSize: '9px', fontFamily: 'Outfit, sans-serif' }} />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
+                              borderColor: darkMode ? '#1e293b' : '#e2e8f0',
+                              borderRadius: '12px',
+                              fontFamily: 'Outfit, sans-serif',
+                              fontSize: '11px',
+                              color: darkMode ? '#f8fafc' : '#0f172a'
+                            }}
+                            formatter={(value) => [formatarMoeda(value), '']} 
+                          />
                           <Bar dataKey="Empenhado" fill="#ec4899" radius={[0, 4, 4, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
 
-                  <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
-                    <div className="flex justify-between items-center mb-4">
-                      <div>
-                        <h3 className="text-base font-bold">Empenhos para a Data de Hoje</h3>
-                        <p className="text-[10px] text-slate-500">Filtrado automaticamente para 05/01/2026</p>
-                      </div>
-                      <span className="px-3 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded-lg text-xs font-bold">
-                        Total: {formatarMoeda(valorHoje)}
-                      </span>
-                    </div>
-                    <div className="overflow-y-auto h-60">
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="border-b border-slate-100 dark:border-slate-800">
-                            <th className="py-2 text-xs font-semibold text-slate-400">Credor</th>
-                            <th className="py-2 text-xs font-semibold text-slate-400">Num NE</th>
-                            <th className="py-2 text-xs font-semibold text-slate-400 text-right">Valor Empenhado</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {empenhosHoje.length > 0 ? (
-                            empenhosHoje.map((item, idx) => (
-                              <tr key={idx} className="border-b border-slate-50 dark:border-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/20 text-xs">
-                                <td className="py-2.5 font-semibold truncate max-w-xs">{item.Credor}</td>
-                                <td className="py-2.5 text-slate-500">{item.Num_NE}</td>
-                                <td className="py-2.5 font-bold text-right text-emerald-500">{formatarMoeda(item.Emp_Acum)}</td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan="3" className="py-8 text-center text-xs text-slate-400">Nenhum registro hoje.</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                    <h3 className="text-base font-bold mb-4">Maiores Gastos por Unidade Orçamentária (Top 5 UOs)</h3>
+                    <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={despesasPorUO}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
+                          <XAxis dataKey="name" stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '9px', fontFamily: 'Outfit, sans-serif' }} />
+                          <YAxis tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
+                              borderColor: darkMode ? '#1e293b' : '#e2e8f0',
+                              borderRadius: '12px',
+                              fontFamily: 'Outfit, sans-serif',
+                              fontSize: '11px',
+                              color: darkMode ? '#f8fafc' : '#0f172a'
+                            }}
+                            formatter={(value) => [formatarMoeda(value), '']} 
+                          />
+                          <Legend wrapperStyle={{ fontFamily: 'Outfit, sans-serif', fontSize: '11px' }} />
+                          <Bar dataKey="Empenhado" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="Pago" fill="#10b981" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
                   </div>
                 </div>
@@ -667,7 +1144,7 @@ export default function App() {
             {currentPage === 'avancados' && (
               <div className="space-y-8 animate-fadeIn">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm col-span-2`}>
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm col-span-2`}>
                     <h3 className="text-base font-bold mb-4">Empenhos por Natureza</h3>
                     <div className="h-80 flex flex-col md:flex-row items-center justify-around">
                       <div className="h-64 w-64">
@@ -680,28 +1157,44 @@ export default function App() {
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
-                      <div className="space-y-2 max-h-64 overflow-y-auto text-xs">
+                      <div className="space-y-2 max-h-64 overflow-y-auto pr-4 text-xs scrollbar-thin">
                         {despesasPorNatureza.map((entry, index) => (
                           <div key={index} className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                            <span className="font-medium truncate max-w-xs">{entry.name}: {formatarMoeda(entry.value)}</span>
+                            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                            <span className="font-medium text-slate-800 dark:text-slate-200 truncate max-w-xs">{entry.name}: {formatarMoeda(entry.value)}</span>
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
 
-                  <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm flex flex-col items-center justify-center`}>
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center`}>
                     <h3 className="text-base font-bold mb-2">Execução Geral</h3>
-                    <div className="relative w-44 h-22 overflow-hidden mb-4">
-                      <div className="absolute top-0 left-0 w-44 h-44 rounded-full border-12 border-slate-200 dark:border-slate-800"></div>
-                      <div className="absolute top-0 left-0 w-44 h-44 rounded-full border-12 border-indigo-600 transition-transform duration-700" style={{ clipPath: 'polygon(0 50%, 100% 50%, 100% 0, 0 0)', transform: `rotate(${Math.min(180, (percentualExecucao / 100) * 180)}deg)`, transformOrigin: '50% 50%' }}></div>
-                      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center"><span className="text-3xl font-extrabold">{percentualExecucao.toFixed(1)}%</span></div>
+                    <div className="relative w-48 h-24 overflow-hidden mb-4 flex items-center justify-center">
+                      <PieChart width={192} height={192} style={{ position: 'absolute', top: 0 }}>
+                        <Pie
+                          data={[
+                            { value: Math.min(100, percentualExecucao), fill: '#4f46e5' },
+                            { value: Math.max(0, 100 - Math.min(100, percentualExecucao)), fill: darkMode ? '#1e293b' : '#e2e8f0' }
+                          ]}
+                          cx={96}
+                          cy={96}
+                          startAngle={180}
+                          endAngle={0}
+                          innerRadius={65}
+                          outerRadius={85}
+                          dataKey="value"
+                          stroke="none"
+                        />
+                      </PieChart>
+                      <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center justify-end">
+                        <span className="text-2xl font-extrabold text-slate-800 dark:text-white leading-none">{percentualExecucao.toFixed(1)}%</span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                   <h3 className="text-base font-bold mb-4">Funil Orçamentário</h3>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
@@ -718,51 +1211,107 @@ export default function App() {
             )}
 
             {/* Auditoria */}
-            {currentPage === 'auditoria' && (
-              <div className="space-y-8 animate-fadeIn">
-                <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
-                  <h3 className="text-base font-bold mb-1">Matriz de Gargalos e Auditoria</h3>
-                  <p className="text-xs text-slate-500 mb-6">Detalhamento dos Credores com empenhos sob risco ou gargalo de pagamento.</p>
+            {currentPage === 'auditoria' && (() => {
+              const dadosAuditoria = dadosFiltrados.filter(item => {
+                const bateCredor = item.Credor.toLowerCase().includes(buscaAuditoriaCredor.toLowerCase());
+                const bateNE = item.Num_NE.toLowerCase().includes(buscaAuditoriaNE.toLowerCase());
+                
+                const riscoGargalo = item.A_Pagar > 50000 || item.A_Liquidar > 100000;
+                const bateStatus = filtroAuditoriaStatus === 'Todos' || 
+                  (filtroAuditoriaStatus === 'Gargalo' && riscoGargalo) ||
+                  (filtroAuditoriaStatus === 'Seguro' && !riscoGargalo);
                   
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="border-b border-slate-200 dark:border-slate-800">
-                          <th className="pb-3 text-xs font-semibold text-slate-400">Credor</th>
-                          <th className="pb-3 text-xs font-semibold text-slate-400">Nº NE</th>
-                          <th className="pb-3 text-xs font-semibold text-slate-400 text-right">A Liquidar</th>
-                          <th className="pb-3 text-xs font-semibold text-slate-400 text-right">A Pagar</th>
-                          <th className="pb-3 text-xs font-semibold text-slate-400 text-center">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dadosFiltrados.map((item, idx) => {
-                          const riscoGargalo = item.A_Pagar > 50000 || item.A_Liquidar > 100000;
-                          return (
-                            <tr key={idx} className="border-b border-slate-50 dark:border-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800/20 text-xs">
-                              <td className="py-3.5 font-bold truncate max-w-xs">{item.Credor}</td>
-                              <td className="py-3.5">{item.Num_NE}</td>
-                              <td className="py-3.5 text-right text-amber-500 font-semibold">{formatarMoeda(item.A_Liquidar)}</td>
-                              <td className="py-3.5 text-right text-rose-500 font-semibold">{formatarMoeda(item.A_Pagar)}</td>
-                              <td className="py-3.5 text-center">
-                                {riscoGargalo ? <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950 text-rose-600">Gargalo</span> : <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-600">Seguro</span>}
-                              </td>
+                return bateCredor && bateNE && bateStatus;
+              });
+
+              return (
+                <div className="space-y-8 animate-fadeIn">
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                    <h3 className="text-base font-bold mb-1">Matriz de Gargalos e Auditoria</h3>
+                    <p className="text-xs text-slate-500 mb-6">Detalhamento dos Credores com empenhos sob risco ou gargalo de pagamento.</p>
+                    
+                    {/* Filtros específicos de Auditoria */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 hide-in-pdf">
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Buscar Credor</label>
+                        <input 
+                          type="text"
+                          placeholder="Filtrar por nome do Credor..."
+                          value={buscaAuditoriaCredor}
+                          onChange={(e) => setBuscaAuditoriaCredor(e.target.value)}
+                          className={`w-full px-3 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-850 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Buscar NE</label>
+                        <input 
+                          type="text"
+                          placeholder="Filtrar por número da NE..."
+                          value={buscaAuditoriaNE}
+                          onChange={(e) => setBuscaAuditoriaNE(e.target.value)}
+                          className={`w-full px-3 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-850 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Status</label>
+                        <select
+                          value={filtroAuditoriaStatus}
+                          onChange={(e) => setFiltroAuditoriaStatus(e.target.value)}
+                          className={`w-full px-3 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-850 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
+                        >
+                          <option value="Todos">Todos os Status</option>
+                          <option value="Gargalo">Apenas Gargalo</option>
+                          <option value="Seguro">Apenas Seguro</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-slate-200 dark:border-slate-800">
+                            <th className="pb-3 text-xs font-semibold text-slate-400">Credor</th>
+                            <th className="pb-3 text-xs font-semibold text-slate-400">Nº NE</th>
+                            <th className="pb-3 text-xs font-semibold text-slate-400 text-right">A Liquidar</th>
+                            <th className="pb-3 text-xs font-semibold text-slate-400 text-right">A Pagar</th>
+                            <th className="pb-3 text-xs font-semibold text-slate-400 text-center">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dadosAuditoria.length > 0 ? (
+                            dadosAuditoria.map((item, idx) => {
+                              const riscoGargalo = item.A_Pagar > 50000 || item.A_Liquidar > 100000;
+                              return (
+                                <tr key={idx} className="border-b border-slate-50 dark:border-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800/20 text-xs">
+                                  <td className="py-3.5 font-bold truncate max-w-xs">{item.Credor}</td>
+                                  <td className="py-3.5 font-mono">{item.Num_NE}</td>
+                                  <td className="py-3.5 text-right text-amber-500 font-semibold">{formatarMoeda(item.A_Liquidar)}</td>
+                                  <td className="py-3.5 text-right text-rose-500 font-semibold">{formatarMoeda(item.A_Pagar)}</td>
+                                  <td className="py-3.5 text-center">
+                                    {riscoGargalo ? <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950 text-rose-600">Gargalo</span> : <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-600">Seguro</span>}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          ) : (
+                            <tr>
+                              <td colSpan="5" className="py-8 text-center text-xs text-slate-400">Nenhum empenho encontrado com os filtros aplicados.</td>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </>
         )}
 
         {/* Upload de Relatórios (Sempre Disponível) */}
         {currentPage === 'upload' && (
           <div className="space-y-8 animate-fadeIn">
-            <div className={`p-8 rounded-2xl border-2 border-dashed ${darkMode ? 'border-slate-800 bg-slate-900/40' : 'border-slate-200 bg-white'} text-center flex flex-col items-center justify-center`}>
+            <div className={`p-8 rounded-2xl border-2 border-dashed ${darkMode ? 'border-slate-800 bg-[rgba(15,23,42,0.4)]' : 'border-slate-200 bg-white'} text-center flex flex-col items-center justify-center`}>
               <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center text-indigo-600 mb-4 shadow-sm">
                 <Upload size={24} />
               </div>
@@ -775,21 +1324,21 @@ export default function App() {
               </label>
             </div>
 
-            <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+            <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
               <h3 className="text-base font-bold mb-4">Arquivos Processados por Pandas</h3>
               {arquivos.length === 0 ? (
                 <p className="text-xs text-slate-400 text-center py-6">Nenhum arquivo enviado até o momento.</p>
               ) : (
                 <div className="space-y-3">
                   {arquivos.map((arq, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/30 text-xs">
+                    <div key={idx} className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 text-xs text-slate-800 dark:text-slate-100">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 flex items-center justify-center text-emerald-600">
                           <FileSpreadsheet size={18} />
                         </div>
                         <div>
-                          <h4 className="font-bold truncate max-w-xs">{arq.nome_original}</h4>
-                          <span className="text-[10px] text-slate-500">{arq.total_linhas} linhas extraídas • {arq.processado_em}</span>
+                          <h4 className="font-bold text-slate-800 dark:text-slate-100 truncate max-w-xs">{arq.nome_original}</h4>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400">{arq.total_linhas} linhas extraídas • {arq.processado_em}</span>
                         </div>
                       </div>
                       
@@ -810,7 +1359,7 @@ export default function App() {
           <div className="space-y-8 animate-fadeIn">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+              <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                 <h3 className="text-base font-bold mb-1">{editingEmail ? 'Editar Usuário' : 'Autorizar Novo Acesso'}</h3>
                 <p className="text-xs text-slate-500 mb-6">Cadastre ou edite credenciais de acesso locais ao painel.</p>
                 
@@ -852,6 +1401,17 @@ export default function App() {
                   </div>
 
                   <div>
+                    <label className="text-xs font-semibold text-slate-400 block mb-1">Setor / Departamento</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ex: Financeiro, TI, Diretoria"
+                      value={novoSetor}
+                      onChange={(e) => setNovoSetor(e.target.value)}
+                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                    />
+                  </div>
+
+                  <div>
                     <label className="text-xs font-semibold text-slate-400 block mb-1">Cargo</label>
                     <select 
                       value={novoCargo}
@@ -879,6 +1439,7 @@ export default function App() {
                         setNovoEmail('');
                         setNovaSenha('');
                         setNovoCargo('viewer');
+                        setNovoSetor('');
                       }}
                       className="w-full py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition mt-2"
                     >
@@ -888,30 +1449,35 @@ export default function App() {
                 </form>
               </div>
 
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm lg:col-span-2`}>
-                <h3 className="text-base font-bold mb-4">Usuários e Credenciais do Painel</h3>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm lg:col-span-2`}>
+                <h3 className="text-base font-bold mb-6">Usuários e Credenciais do Painel</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {usuariosAutorizados.map((usr, index) => (
-                    <div key={index} className="flex justify-between items-center py-3 text-xs">
-                      <div>
-                        <h4 className="font-bold text-sm">{usr.name}</h4>
-                        <span className="text-slate-400 block">{usr.email}</span>
-                        <span className="text-slate-500 block">Senha: <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">{usr.password || '123456'}</code></span>
+                    <div key={index} className={`p-4 rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'} flex flex-col justify-between space-y-3`}>
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-start">
+                          <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate pr-2" title={usr.name}>{usr.name}</h4>
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${usr.role === 'admin' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-slate-100 text-slate-800 dark:bg-slate-850 dark:text-slate-350'}`}>
+                            {usr.role === 'admin' ? 'Admin' : 'Visualizador'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{usr.email}</p>
+                        <div className="flex flex-col gap-y-1 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                          <div>Setor: <strong className="text-slate-700 dark:text-slate-200 font-bold">{usr.setor || (usr.email === 'lucivaldo586@gmail.com' ? 'Diretoria' : 'Não Informado')}</strong></div>
+                          <div>Senha: <code className="bg-slate-200/50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded font-mono font-bold text-[10px]">{usr.password || '123456'}</code></div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${usr.role === 'admin' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'}`}>
-                          {usr.role === 'admin' ? 'Admin' : 'Visualizador'}
-                        </span>
+                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-250 dark:border-slate-800/80">
                         <button 
                           onClick={() => iniciarEdicao(usr)}
-                          className="px-2 py-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 rounded text-[10px] font-semibold"
+                          className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 rounded-lg text-[10px] font-bold transition"
                         >
                           Editar
                         </button>
                         {usr.email !== 'lucivaldo586@gmail.com' && (
                           <button 
                             onClick={() => removerUsuario(usr.email)}
-                            className="px-2 py-1 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 text-rose-600 dark:text-rose-450 rounded text-[10px] font-semibold"
+                            className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 text-rose-600 dark:text-rose-450 rounded-lg text-[10px] font-bold transition"
                           >
                             Remover
                           </button>
@@ -925,7 +1491,56 @@ export default function App() {
             </div>
           </div>
         )}
+
+
       </main>
+
+      {/* Modal de Alertas Customizado */}
+      {alertModal.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fadeIn hide-in-pdf">
+          <div className={`w-full max-w-sm p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-2xl shadow-indigo-500/10 transition-all duration-300`}>
+            <div className="flex items-center gap-3 mb-4">
+              {alertModal.type === 'success' && <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600"><ShieldCheck size={20} /></div>}
+              {alertModal.type === 'error' && <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-950/40 flex items-center justify-center text-rose-600"><AlertCircle size={20} /></div>}
+              {alertModal.type === 'warning' && <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center text-amber-600"><AlertTriangle size={20} /></div>}
+              {alertModal.type === 'info' && <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400"><AlertCircle size={20} /></div>}
+              {alertModal.type === 'confirm' && <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400"><AlertCircle size={20} /></div>}
+              <h3 className="text-sm font-extrabold">{alertModal.title}</h3>
+            </div>
+            
+            <p className="text-xs text-slate-500 dark:text-slate-300 mb-6 leading-relaxed whitespace-pre-wrap">{alertModal.message}</p>
+            
+            <div className="flex justify-end gap-2 text-xs font-bold">
+              {alertModal.type === 'confirm' ? (
+                <>
+                  <button 
+                    onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
+                    className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (alertModal.onConfirm) alertModal.onConfirm();
+                      setAlertModal(prev => ({ ...prev, show: false }));
+                    }}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow transition"
+                  >
+                    Confirmar
+                  </button>
+                </>
+              ) : (
+                <button 
+                  onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow transition"
+                >
+                  OK
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -26,3 +26,39 @@
 .dark ::-webkit-scrollbar-thumb {
   background: #334155;
 }
+
+/* Classes Customizadas Hexadecimal para evitar erros de OKLCH no html2canvas */
+.custom-bg-light { background-color: #f8fafc !important; color: #0f172a !important; }
+.custom-bg-dark { background-color: #020617 !important; color: #f8fafc !important; }
+
+.custom-card-light { background-color: #ffffff !important; border-color: #e2e8f0 !important; color: #0f172a !important; }
+.custom-card-dark { background-color: #0f172a !important; border-color: #1e293b !important; color: #f8fafc !important; }
+
+.custom-sidebar-light { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
+.custom-sidebar-dark { background-color: #090d16 !important; border-color: #1e293b !important; }
+
+.custom-text-light { color: #334155 !important; }
+.custom-text-dark { color: #cbd5e1 !important; }
+
+.custom-border-light { border-color: #e2e8f0 !important; }
+.custom-border-dark { border-color: #1e293b !important; }
+
+/* Ocultar elementos específicos na exportação do PDF */
+.exporting-pdf .hide-in-pdf {
+  display: none !important;
+}
+
+/* Forçar visual limpo no PDF */
+.exporting-pdf {
+  overflow: visible !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
