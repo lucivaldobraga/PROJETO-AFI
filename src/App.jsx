@@ -213,14 +213,57 @@ export default function App() {
   const [novoSetor, setNovoSetor] = useState('');
   const [editingEmail, setEditingEmail] = useState(null);
 
-  const cadastrarUsuario = (e) => {
+  // Estados e controle de Setores
+  const [setores, setSetores] = useState(() => {
+    const stored = localStorage.getItem('afi_setores');
+    return stored ? JSON.parse(stored) : ['Diretoria', 'Financeiro', 'TI', 'RH', 'Suporte'];
+  });
+  const [novoSetorInput, setNovoSetorInput] = useState('');
+
+  useEffect(() => {
+    localStorage.setItem('afi_setores', JSON.stringify(setores));
+  }, [setores]);
+
+  const handleAdicionarSetor = (e) => {
     e.preventDefault();
+    const clean = novoSetorInput.trim();
+    if (!clean) return;
+    if (setores.some(s => s.toLowerCase() === clean.toLowerCase())) {
+      const existente = setores.find(s => s.toLowerCase() === clean.toLowerCase());
+      setNovoSetor(existente);
+      setNovoSetorInput('');
+      return;
+    }
+    setSetores(prev => [...prev, clean]);
+    setNovoSetor(clean);
+    setNovoSetorInput('');
+    customAlert("Sucesso", `Setor "${clean}" adicionado com sucesso!`, "success");
+  };
+
+  const cadastrarUsuario = (e) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
     if (!novoEmail || !novoNome || !novaSenha) return;
 
     if (editingEmail) {
       setUsuariosAutorizados(prev => prev.map(u =>
         u.email === editingEmail ? { ...u, name: novoNome, email: novoEmail, password: novaSenha, role: novoCargo, setor: novoSetor } : u
       ));
+      
+      // Se for o próprio usuário logado se editando, atualiza a sessão local
+      if (user && user.email.toLowerCase() === editingEmail.toLowerCase()) {
+        const updatedUser = { 
+          email: novoEmail, 
+          name: novoNome, 
+          role: novoCargo, 
+          setor: novoSetor,
+          password: novaSenha 
+        };
+        localStorage.setItem('afi_user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+      }
+      
       customAlert("Sucesso", `Usuário ${novoNome} atualizado com sucesso!`, "success");
       setEditingEmail(null);
     } else {
@@ -251,6 +294,10 @@ export default function App() {
   const removerUsuario = (email) => {
     if (email === 'lucivaldo586@gmail.com') {
       customAlert("Aviso", "Não é possível remover o administrador padrão!", "warning");
+      return;
+    }
+    if (user && email.toLowerCase() === user.email.toLowerCase()) {
+      customAlert("Aviso", "Não é possível remover a si mesmo!", "warning");
       return;
     }
     customConfirm(
@@ -311,6 +358,7 @@ export default function App() {
     // Validar usuário na lista local/sandbox primeiro
     const usuarioExiste = usuariosAutorizados.find(u => u.email === emailInput);
     if (usuarioExiste && usuarioExiste.password === passwordInput) {
+      localStorage.setItem('afi_user', JSON.stringify(usuarioExiste));
       setUser(usuarioExiste);
       setIsAuthenticated(true);
       carregarDadosFirebase();
@@ -325,6 +373,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    localStorage.removeItem('afi_user');
     try {
       await firebaseService.logout();
     } catch (error) {
@@ -948,7 +997,7 @@ export default function App() {
             >
               <Upload size={18} /> Upload e Histórico
             </button>
-            {user?.email === 'lucivaldo586@gmail.com' && (
+            {user?.role === 'admin' && (
               <button
                 onClick={() => setCurrentPage('usuarios')}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all text-sm font-semibold ${currentPage === 'usuarios' ? 'm3-nav-item-active' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-850 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-slate-200'}`}
@@ -1643,15 +1692,14 @@ export default function App() {
         )}
 
         {/* Gerenciamento de Usuários */}
-        {currentPage === 'usuarios' && user?.email === 'lucivaldo586@gmail.com' && (
+        {currentPage === 'usuarios' && user?.role === 'admin' && (
           <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto w-full">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
               <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
-                <h3 className="text-base font-bold mb-1">{editingEmail ? 'Editar Usuário' : 'Autorizar Novo Acesso'}</h3>
-                <p className="text-xs text-slate-500 mb-6">Cadastre ou edite credenciais de acesso locais ao painel.</p>
-
-                <form onSubmit={cadastrarUsuario} className="space-y-4">
+                <h3 className="text-base font-bold mb-1">{editingEmail ? 'Editar Usuário' : 'Cadastrar Novo Usuário'}</h3>
+                <p className="text-xs text-slate-400 mb-6">{editingEmail ? 'Altere as credenciais ou dados do usuário.' : 'Defina os dados para criação de novo perfil.'}</p>
+                <div className="space-y-4">
                   <div>
                     <label className="text-xs font-semibold text-slate-400 block mb-1">Nome Completo</label>
                     <input
@@ -1660,6 +1708,7 @@ export default function App() {
                       placeholder="Ex: Lucivaldo Braga"
                       value={novoNome}
                       onChange={(e) => setNovoNome(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') cadastrarUsuario(e); }}
                       className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
                     />
                   </div>
@@ -1667,11 +1716,15 @@ export default function App() {
                   <div>
                     <label className="text-xs font-semibold text-slate-400 block mb-1">E-mail</label>
                     <input
-                      type="email"
+                      type="text"
                       required
                       placeholder="usuario@cetam.am.gov.br"
+                      autoComplete="off"
+                      name="usr_reg_email"
+                      id="usr_reg_email"
                       value={novoEmail}
                       onChange={(e) => setNovoEmail(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') cadastrarUsuario(e); }}
                       className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
                     />
                   </div>
@@ -1682,21 +1735,47 @@ export default function App() {
                       type="text"
                       required
                       placeholder="Senha do usuário"
+                      autoComplete="off"
+                      name="usr_reg_pwd"
+                      id="usr_reg_pwd"
                       value={novaSenha}
                       onChange={(e) => setNovaSenha(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') cadastrarUsuario(e); }}
                       className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
                     />
                   </div>
 
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 block mb-1">Setor / Departamento</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Financeiro, TI, Diretoria"
-                      value={novoSetor}
-                      onChange={(e) => setNovoSetor(e.target.value)}
-                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
-                    />
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-400 block">Setor / Departamento</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={novoSetor}
+                        onChange={(e) => setNovoSetor(e.target.value)}
+                        className={`flex-1 px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                      >
+                        <option value="">Selecione um Setor...</option>
+                        {setores.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    
+                    {/* Campo para cadastrar novo setor */}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Cadastrar novo setor..."
+                        value={novoSetorInput}
+                        onChange={(e) => setNovoSetorInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAdicionarSetor(e); }}
+                        className={`flex-1 px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAdicionarSetor}
+                        className="px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 shadow"
+                      >
+                        <Plus size={14} /> Adicionar
+                      </button>
+                    </div>
                   </div>
 
                   <div>
@@ -1704,6 +1783,7 @@ export default function App() {
                     <select
                       value={novoCargo}
                       onChange={(e) => setNovoCargo(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') cadastrarUsuario(e); }}
                       className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
                     >
                       <option value="viewer">Visualizador Geral</option>
@@ -1712,7 +1792,8 @@ export default function App() {
                   </div>
 
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={cadastrarUsuario}
                     className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow transition"
                   >
                     {editingEmail ? 'Atualizar Usuário' : 'Cadastrar'}
@@ -1734,7 +1815,7 @@ export default function App() {
                       Cancelar Edição
                     </button>
                   )}
-                </form>
+                </div>
               </div>
 
               <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm lg:col-span-2`}>
