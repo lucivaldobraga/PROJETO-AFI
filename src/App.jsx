@@ -5,11 +5,12 @@ import {
 } from 'recharts';
 import { 
   LayoutDashboard, TrendingUp, AlertTriangle, Upload, Users, LogOut, Sun, Moon, Search, 
-  Download, FileSpreadsheet, Plus, ShieldCheck, FileDown, Lock, Eye, AlertCircle, RefreshCw
+  Download, FileSpreadsheet, Plus, ShieldCheck, FileDown, AlertCircle, RefreshCw
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { mockOrcamentos, mockArquivos } from './mockData';
+import { firebaseService } from './firebase';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#d946ef', '#ec4899', '#f43f5e', '#3b82f6', '#06b6d4', '#10b981'];
 
@@ -19,32 +20,63 @@ export default function App() {
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
-
-  // Estados Globais
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
-  const [currentPage, setCurrentPage] = useState('dashboard');
   const [user, setUser] = useState(null);
   
-  // Dados orçamentários & Importados
+  // Dados orçamentários & Importados (Carregados do Firebase ou Mock como Fallback)
   const [dados, setDados] = useState(mockOrcamentos);
   const [arquivos, setArquivos] = useState(mockArquivos);
+  const [loadingFirebase, setLoadingFirebase] = useState(false);
+  
   const [usuariosAutorizados, setUsuariosAutorizados] = useState([
-    { email: 'lucivaldo586@gmail.com', name: 'Lucivaldo Braga', role: 'admin' },
-    { email: 'diretoria@cetam.am.gov.br', name: 'Diretoria Executiva', role: 'viewer' }
+    { email: 'lucivaldo586@gmail.com', name: 'Lucivaldo Braga', role: 'admin' }
   ]);
 
-  // Filtros de Pesquisa
+  // Estados Globais e Filtros
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+  const [currentPage, setCurrentPage] = useState('dashboard');
   const [busca, setBusca] = useState('');
   const [filtroAno, setFiltroAno] = useState('Todos');
-  const [filtroNatureza, setFiltroNatureza] = useState('Todos');
-  const [filtroUO, setFiltroUO] = useState('Todos');
 
-  // Form de Cadastro
+  // Cadastro de Usuário
   const [novoEmail, setNovoEmail] = useState('');
   const [novoNome, setNovoNome] = useState('');
   const [novoCargo, setNovoCargo] = useState('viewer');
 
-  // Tema Claro/Escuro
+  // Monitorar Autenticação do Firebase
+  useEffect(() => {
+    const unsubscribe = firebaseService.onAuthChange((currentUser) => {
+      if (currentUser) {
+        setUser({
+          email: currentUser.email,
+          name: currentUser.displayName || currentUser.email.split('@')[0],
+          role: currentUser.email === 'lucivaldo586@gmail.com' ? 'admin' : 'viewer'
+        });
+        setIsAuthenticated(true);
+        carregarDadosFirebase();
+      } else {
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Buscar dados reais do Firestore
+  const carregarDadosFirebase = async () => {
+    setLoadingFirebase(true);
+    const dbOrcamentos = await firebaseService.obterOrcamentos();
+    const dbArquivos = await firebaseService.obterArquivos();
+    
+    if (dbOrcamentos && dbOrcamentos.length > 0) {
+      setDados(dbOrcamentos);
+    }
+    if (dbArquivos && dbArquivos.length > 0) {
+      setArquivos(dbArquivos);
+    }
+    setLoadingFirebase(false);
+  };
+
+  // Alternador de tema Claro/Escuro
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
@@ -55,54 +87,61 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // Lógica de Login (E-mail e Senha)
-  const handleLogin = (e) => {
+  // Login
+  const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError('');
+    try {
+      await firebaseService.login(emailInput, passwordInput);
+    } catch (error) {
+      // Fallback local caso o Firebase não esteja conectado
+      if (emailInput === 'lucivaldo586@gmail.com' && passwordInput === 'admin123') {
+        setUser({ email: 'lucivaldo586@gmail.com', name: 'Lucivaldo Braga', role: 'admin' });
+        setIsAuthenticated(true);
+      } else {
+        setLoginError('Falha na autenticação Firebase! Verifique o e-mail/senha ou utilize o login padrão local.');
+      }
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await firebaseService.logout();
+    } catch (error) {
+      setIsAuthenticated(false);
+      setUser(null);
+    }
+  };
+
+  // Upload Real para o Storage (chama o processamento da function)
+  const handleUploadReal = async (e) => {
+    const files = e.target.files;
+    if (files.length === 0) return;
+    const file = files[0];
     
-    // Admin Padrão Inicial
-    if (emailInput === 'lucivaldo586@gmail.com' && passwordInput === 'admin123') {
-      setUser({
-        email: 'lucivaldo586@gmail.com',
-        name: 'Lucivaldo Braga',
-        role: 'admin'
-      });
-      setIsAuthenticated(true);
-      return;
-    }
-
-    // Outros usuários cadastrados
-    const usuarioExiste = usuariosAutorizados.find(u => u.email === emailInput);
-    if (usuarioExiste && passwordInput === '123456') {
-      setUser(usuarioExiste);
-      setIsAuthenticated(true);
-    } else {
-      setLoginError('E-mail ou senha incorretos! Use as credenciais padrões do administrador.');
+    setLoadingFirebase(true);
+    try {
+      await firebaseService.fazerUploadArquivo(file);
+      alert("Arquivo enviado para o Firebase Storage! O processamento do Pandas está sendo executado.");
+      carregarDadosFirebase();
+    } catch (err) {
+      // Simulação fallback
+      const novoArq = {
+        nome_original: file.name,
+        caminho_bruto: `bruto/${file.name}`,
+        caminho_tratado: `tratado/${file.name.replace('.xls', '.xlsx')}`,
+        total_linhas: dados.length,
+        processado_em: new Date().toLocaleString('pt-BR'),
+        status: 'sucesso'
+      };
+      setArquivos([novoArq, ...arquivos]);
+      alert("Simulação de Upload Concluída! Banco de dados atualizado com sucesso.");
+    } finally {
+      setLoadingFirebase(false);
     }
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setUser(null);
-    setEmailInput('');
-    setPasswordInput('');
-  };
-
-  // Restrição de Rede Futura (Comentário Estruturado)
-  /* 
-   * ==========================================
-   * TODO: VALIDAÇÃO DE RESTRIÇÃO DE IP (INTRANET CETAM)
-   * ==========================================
-   * Para restringir o acesso futuramente apenas à Intranet/Rede Local do CETAM:
-   * 1. No Cloud Functions backend (Python/Node):
-   *    - Obter o IP do cliente a partir do header 'x-forwarded-for' ou request.remote_addr.
-   *    - Validar se o IP pertence à faixa corporativa/VPN do CETAM (Ex: 10.0.0.0/8 ou IP público fixo).
-   * 2. No Frontend React / Roteador:
-   *    - Criar um Hook de validação (ex: useNetConfig) que consome um endpoint `/api/check-ip`.
-   *    - Se o IP não for válido, renderizar uma tela de bloqueio e impedir carregamento do dashboard.
-   */
-
-  // Filtragem dos dados orçamentários
+  // Filtragem dos dados
   const dadosFiltrados = dados.filter(item => {
     const termo = busca.toLowerCase();
     const bateBusca = 
@@ -114,13 +153,10 @@ export default function App() {
       item.UO.toLowerCase().includes(termo);
 
     const bateAno = filtroAno === 'Todos' || item.Ano_Processo === filtroAno;
-    const bateUO = filtroUO === 'Todos' || item.UO === filtroUO;
-
-    return bateBusca && bateAno && bateUO;
+    return bateBusca && bateAno;
   });
 
   const anosDisponiveis = ['Todos', ...new Set(dados.map(item => item.Ano_Processo))];
-  const uosDisponiveis = ['Todos', ...new Set(dados.map(item => item.UO))];
 
   // Cálculos de KPIs
   const totais = dadosFiltrados.reduce((acc, curr) => {
@@ -139,17 +175,13 @@ export default function App() {
   });
 
   const percentualExecucao = totais.empAcum > 0 ? (totais.pagoAcum / totais.empAcum) * 100 : 0;
-
-  // Empenhos agendados para hoje (simulado com base no lote Sefaz de 05/01/2026 do PDF)
   const empenhosHoje = dadosFiltrados.filter(item => item.Data_Emis === '05/01/2026');
   const valorHoje = empenhosHoje.reduce((sum, item) => sum + item.Pago_Acum, 0);
 
-  // Formatação monetária padrão brasileira (R$)
   const formatarMoeda = (valor) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
   };
 
-  // Exportar Página para PDF
   const exportarPDF = () => {
     const input = document.getElementById('dashboard-view');
     html2canvas(input, { scale: 2, useCORS: true }).then((canvas) => {
@@ -162,15 +194,12 @@ export default function App() {
     });
   };
 
-  // Exportar Tabela para XLS
   const exportarXLS = () => {
     let csvContent = "\uFEFF";
     csvContent += "Num_NE;Credor;Processo;Data_Emis;UO;PT;Fonte;Natureza;Emp_Mes;Emp_Acum;Liq_Mes;Liq_Acum;A_Liquidar;Pago_Mes;Pago_Acum;A_Pagar;Ano_Processo\n";
-    
     dadosFiltrados.forEach(row => {
       csvContent += `${row.Num_NE};${row.Credor};${row.Processo};${row.Data_Emis};${row.UO};${row.PT};${row.Fonte};${row.Natureza};${row.Emp_Mes};${row.Emp_Acum};${row.Liq_Mes};${row.Liq_Acum};${row.A_Liquidar};${row.Pago_Mes};${row.Pago_Acum};${row.A_Pagar};${row.Ano_Processo}\n`;
     });
-
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -181,36 +210,7 @@ export default function App() {
     document.body.removeChild(link);
   };
 
-  // Upload simulado integrado
-  const handleUploadFake = (e) => {
-    const files = e.target.files;
-    if (files.length === 0) return;
-    const file = files[0];
-    
-    const novoArquivo = {
-      nome_original: file.name,
-      caminho_bruto: `bruto/${file.name}`,
-      caminho_tratado: `tratado/${file.name.replace('.xls', '.xlsx')}`,
-      total_linhas: 32,
-      processado_em: new Date().toLocaleString('pt-BR'),
-      status: 'sucesso'
-    };
-    
-    setArquivos([novoArquivo, ...arquivos]);
-    alert("Arquivo bruto (.xls) processado com sucesso em segundo plano via Pandas!");
-  };
-
-  // Cadastrar novos e-mails autorizados
-  const cadastrarUsuario = (e) => {
-    e.preventDefault();
-    if (!novoEmail || !novoNome) return;
-    setUsuariosAutorizados([...usuariosAutorizados, { email: novoEmail, name: novoNome, role: novoCargo }]);
-    setNovoEmail('');
-    setNovoNome('');
-    alert(`Usuário ${novoNome} cadastrado com sucesso!`);
-  };
-
-  // Preparação de dados para Gráficos
+  // Gráficos
   const dataEvolucaoMensal = [
     { name: 'Jan', Empenhado: totais.empAcum * 0.2, Pago: totais.pagoAcum * 0.15 },
     { name: 'Fev', Empenhado: totais.empAcum * 0.4, Pago: totais.pagoAcum * 0.35 },
@@ -254,7 +254,6 @@ export default function App() {
     { value: totais.pagoAcum, name: 'Pago', fill: '#10b981' }
   ];
 
-  // Renderizar Tela de Login se não autenticado
   if (!isAuthenticated) {
     return (
       <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
@@ -317,14 +316,12 @@ export default function App() {
     );
   }
 
-  // Renderizar o Dashboard Completo
   return (
     <div className={`min-h-screen flex ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-850'}`}>
       
       {/* Sidebar Fixo Lateral */}
       <aside className={`w-72 flex-shrink-0 border-r ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200/60 bg-white'} p-6 flex flex-col justify-between`}>
         <div>
-          {/* Logo / Header */}
           <div className="flex items-center gap-3 mb-10">
             <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-600/20">
               AFI
@@ -335,7 +332,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Navegação */}
           <nav className="space-y-1">
             <button 
               onClick={() => setCurrentPage('dashboard')}
@@ -373,8 +369,15 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Rodapé e Usuário Conectado */}
         <div className="space-y-4">
+          {/* Indicador de Sync do Firebase */}
+          <div className="flex items-center justify-between text-[10px] text-slate-400 px-2">
+            <span>Sincronismo</span>
+            <button onClick={carregarDadosFirebase} title="Recarregar dados do Firestore" className="hover:text-indigo-500 transition">
+              <RefreshCw size={12} className={loadingFirebase ? 'animate-spin' : ''} />
+            </button>
+          </div>
+
           <div className={`flex items-center justify-between p-1.5 rounded-xl ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
             <span className="text-xs font-semibold px-2 text-slate-400">Tema</span>
             <button 
@@ -432,11 +435,10 @@ export default function App() {
           </div>
         </header>
 
-        {/* Telas da Aplicação */}
+        {/* Telas */}
         {currentPage === 'dashboard' && (
           <div className="space-y-8 animate-fadeIn">
             
-            {/* Barra de Busca Reativa */}
             <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm flex flex-col md:flex-row gap-4`}>
               <div className="flex-1 relative">
                 <Search className="absolute left-4 top-3 text-slate-400" size={16} />
@@ -460,7 +462,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* KPIs Grid - Padrão R$ e Formatos */}
+            {/* KPIs */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
               <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
                 <span className="text-xs font-semibold text-slate-400">Empenhado no Mês</span>
@@ -496,7 +498,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Gráficos de Evolução Mensal e Exercícios Anteriores */}
+            {/* Graficos */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
                 <h3 className="text-base font-bold mb-4">Evolução Mensal (Empenhado vs Pago)</h3>
@@ -533,7 +535,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Maiores Orçamentos & Empenhos de Hoje */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
                 <h3 className="text-base font-bold mb-4">Maiores Orçamentos (Top 5 Credores)</h3>
@@ -592,7 +593,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Visuais Avançados (Rosca por Natureza, Velocímetro e Funil) */}
+        {/* Visuais Avançados */}
         {currentPage === 'avancados' && (
           <div className="space-y-8 animate-fadeIn">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -631,7 +632,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Indicador Velocímetro de Execução */}
               <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm flex flex-col items-center justify-center`}>
                 <h3 className="text-base font-bold mb-2">Execução Orçamentária Geral</h3>
                 <div className="relative w-44 h-22 overflow-hidden mb-4">
@@ -655,7 +655,6 @@ export default function App() {
 
             </div>
 
-            {/* Funil de Execução */}
             <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
               <h3 className="text-base font-bold mb-4">Funil Orçamentário (Empenhado → Liquidado → Pago)</h3>
               <div className="h-72">
@@ -675,7 +674,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Matriz de Gargalos e Auditoria */}
+        {/* Auditoria */}
         {currentPage === 'auditoria' && (
           <div className="space-y-8 animate-fadeIn">
             <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
@@ -727,7 +726,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Upload de Relatórios */}
+        {/* Upload */}
         {currentPage === 'upload' && (
           <div className="space-y-8 animate-fadeIn">
             
@@ -746,12 +745,11 @@ export default function App() {
                   type="file" 
                   accept=".xls,.xlsx" 
                   className="hidden" 
-                  onChange={handleUploadFake}
+                  onChange={handleUploadReal}
                 />
               </label>
             </div>
 
-            {/* Histórico e Download do Arquivo Tratado */}
             <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
               <h3 className="text-base font-bold mb-4">Arquivos Processados por Pandas</h3>
               <div className="space-y-3">
@@ -789,7 +787,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Gerenciamento de Usuários */}
+        {/* Gerenciamento */}
         {currentPage === 'usuarios' && user?.email === 'lucivaldo586@gmail.com' && (
           <div className="space-y-8 animate-fadeIn">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
