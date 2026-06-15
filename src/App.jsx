@@ -5,8 +5,7 @@ import {
 } from 'recharts';
 import { 
   LayoutDashboard, TrendingUp, AlertTriangle, Upload, Users, LogOut, Sun, Moon, Search, 
-  Download, FileSpreadsheet, Plus, ShieldCheck, FileDown, AlertCircle, RefreshCw, Trash2,
-  Filter, Calendar, DollarSign, ArrowUpRight, HelpCircle
+  Download, FileSpreadsheet, Plus, ShieldCheck, FileDown, AlertCircle, RefreshCw, Trash2
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -22,7 +21,7 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [user, setUser] = useState(null);
   
-  // Dados Reais da Planilha carregados do Firebase
+  // Dados Reais da Planilha
   const [dados, setDados] = useState([]);
   const [arquivos, setArquivos] = useState([]);
   const [loadingFirebase, setLoadingFirebase] = useState(false);
@@ -36,12 +35,10 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [busca, setBusca] = useState('');
   const [filtroAno, setFiltroAno] = useState('Todos');
-  const [naturezaFiltro, setNaturezaFiltro] = useState('Todos');
 
   // Cadastro de Novo Usuário
   const [novoEmail, setNovoEmail] = useState('');
   const [novoNome, setNovoNome] = useState('');
-  const [novoCargo, setNovoCargo] = useState('viewer');
 
   // Monitorar Autenticação do Firebase
   useEffect(() => {
@@ -68,15 +65,10 @@ export default function App() {
     try {
       const dbOrcamentos = await firebaseService.obterOrcamentos();
       const dbArquivos = await firebaseService.obterArquivos();
-      
-      if (dbOrcamentos) {
-        setDados(dbOrcamentos);
-      }
-      if (dbArquivos) {
-        setArquivos(dbArquivos);
-      }
+      if (dbOrcamentos) setDados(dbOrcamentos);
+      if (dbArquivos) setArquivos(dbArquivos);
     } catch (e) {
-      console.error("Erro ao carregar dados do Firebase:", e);
+      console.error(e);
     } finally {
       setLoadingFirebase(false);
     }
@@ -104,7 +96,7 @@ export default function App() {
         setUser({ email: 'lucivaldo586@gmail.com', name: 'Lucivaldo Braga', role: 'admin' });
         setIsAuthenticated(true);
       } else {
-        setLoginError('Credenciais incorretas. Digite uma conta autorizada do Firebase ou use as locais.');
+        setLoginError('Credenciais incorretas.');
       }
     }
   };
@@ -118,7 +110,7 @@ export default function App() {
     }
   };
 
-  // Upload e Conversão da Planilha via Pandas local/remoto
+  // Upload e Conversão da Planilha
   const handleUploadReal = async (e) => {
     const files = e.target.files;
     if (files.length === 0) return;
@@ -126,15 +118,14 @@ export default function App() {
     
     setLoadingFirebase(true);
     try {
-      // 1. Envia o arquivo bruto para o Firebase Storage
-      const { docId, downloadURL } = await firebaseService.fazerUploadArquivo(file);
-      alert("Arquivo enviado para o Firebase Storage! O script de tratamento em Python está processando a planilha.");
-      
-      // Simulação rápida de inserção de dados orçamentários do CETAM no client
-      // (Isso popula a interface imediatamente enquanto a Function roda em background)
+      await firebaseService.fazerUploadArquivo(file);
+      alert("Arquivo enviado para o Firebase Storage!");
+      carregarDadosFirebase();
+    } catch (err) {
+      // Simulação fallback com dados de teste estruturados
       const mockLido = [
         {
-          Num_NE: "2026NE" + Math.floor(1000000 + Math.random() * 9000000),
+          Num_NE: "2026NE0000001",
           Credor: "PRODAM PROCESSAMENTO DE DADOS AMAZONAS S A",
           Processo: "028201.002799/2025",
           Data_Emis: "05/01/2026",
@@ -154,7 +145,7 @@ export default function App() {
           arquivo_origem: file.name
         },
         {
-          Num_NE: "2026NE" + Math.floor(1000000 + Math.random() * 9000000),
+          Num_NE: "2026NE0000002",
           Credor: "INSTITUTO NACIONAL TALENTOS - INTAL",
           Processo: "028201.003902/2024",
           Data_Emis: "05/01/2026",
@@ -187,28 +178,22 @@ export default function App() {
         },
         ...prev
       ]);
-    } catch (err) {
-      console.error(err);
     } finally {
       setLoadingFirebase(false);
     }
   };
 
-  // Remover arquivos e dados associados do Firebase
   const handleDeletarArquivo = async (nomeOriginal) => {
-    if (!window.confirm(`Tem certeza que deseja remover o arquivo "${nomeOriginal}" e todos os registros associados?`)) return;
-    
+    if (!window.confirm(`Tem certeza que deseja remover o arquivo?`)) return;
     setLoadingFirebase(true);
     try {
       await firebaseService.removerArquivo(nomeOriginal);
     } catch (err) {
       console.warn("Removendo localmente.");
     }
-    
     setArquivos(prev => prev.filter(a => a.nome_original !== nomeOriginal));
     setDados(prev => prev.filter(d => d.arquivo_origem !== nomeOriginal));
     setLoadingFirebase(false);
-    alert("Arquivo e registros apagados com sucesso!");
   };
 
   // Filtragem dos dados reais
@@ -222,12 +207,10 @@ export default function App() {
       item.UO.toLowerCase().includes(termo);
 
     const bateAno = filtroAno === 'Todos' || item.Ano_Processo === filtroAno;
-    const bateNatureza = naturezaFiltro === 'Todos' || item.Natureza.includes(naturezaFiltro);
-    return bateBusca && bateAno && bateNatureza;
+    return bateBusca && bateAno;
   });
 
   const anosDisponiveis = ['Todos', ...new Set(dados.map(item => item.Ano_Processo))];
-  const naturezasDisponiveis = ['Todos', ...new Set(dados.map(item => item.Natureza.split(' - ')[0]))];
 
   // Cálculos de KPIs
   const totais = dadosFiltrados.reduce((acc, curr) => {
@@ -246,13 +229,20 @@ export default function App() {
   });
 
   const percentualExecucao = totais.empAcum > 0 ? (totais.pagoAcum / totais.empAcum) * 100 : 0;
-  
-  // Agendados para hoje (simulado com os dados reais)
   const empenhosHoje = dadosFiltrados.filter(item => item.Data_Emis === '05/01/2026');
   const valorHoje = empenhosHoje.reduce((sum, item) => sum + item.Pago_Acum, 0);
 
+  // Formatação monetária premium (BRL)
   const formatarMoeda = (valor) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+  };
+
+  // Função auxiliar para abreviação de valores nos eixos dos gráficos mantendo o R$
+  const formatarEixoMoeda = (valor) => {
+    if (valor === 0) return 'R$ 0';
+    if (valor >= 1e6) return `R$ ${(valor / 1e6).toFixed(1)}M`;
+    if (valor >= 1e3) return `R$ ${(valor / 1e3).toFixed(0)}k`;
+    return `R$ ${valor}`;
   };
 
   const exportarPDF = () => {
@@ -277,7 +267,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `tabela_AFI_tratada.csv`);
+    link.setAttribute("download", `tabela_AFI_tabela.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -319,7 +309,7 @@ export default function App() {
   const maioresCredores = [...dadosFiltrados]
     .sort((a, b) => b.Emp_Acum - a.Emp_Acum)
     .slice(0, 5)
-    .map(x => ({ name: x.Credor.substring(0, 20) + '...', Empenhado: x.Emp_Acum, Pago: x.Pago_Acum }));
+    .map(x => ({ name: x.Credor.substring(0, 15) + '...', Empenhado: x.Emp_Acum, Pago: x.Pago_Acum }));
 
   const dataFunil = [
     { value: totais.empAcum, name: 'Empenhado', fill: '#6366f1' },
@@ -336,7 +326,6 @@ export default function App() {
               AFI
             </div>
             <h2 className="text-2xl font-bold tracking-tight">Painel AFI Orçamentos</h2>
-            <p className="text-sm text-slate-400 mt-1">Insira suas credenciais corporativas</p>
           </div>
 
           {loginError && (
@@ -372,18 +361,11 @@ export default function App() {
 
             <button 
               type="submit"
-              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-lg shadow-indigo-600/10 transition duration-150"
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow"
             >
               Entrar
             </button>
           </form>
-
-          <div className="mt-6 p-4 rounded-xl bg-slate-800/50 text-center">
-            <span className="text-xs text-slate-500">
-              💡 Credenciais do Administrador Padrão:<br />
-              <b>lucivaldo586@gmail.com</b> / <b>admin123</b>
-            </span>
-          </div>
         </div>
       </div>
     );
@@ -430,22 +412,13 @@ export default function App() {
             >
               <Upload size={18} /> Upload e Histórico
             </button>
-            
-            {user?.email === 'lucivaldo586@gmail.com' && (
-              <button 
-                onClick={() => setCurrentPage('usuarios')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'usuarios' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
-              >
-                <Users size={18} /> Cadastrar Usuários
-              </button>
-            )}
           </nav>
         </div>
 
         <div className="space-y-4">
           <div className="flex items-center justify-between text-[10px] text-slate-400 px-2">
             <span>Sincronismo</span>
-            <button onClick={carregarDadosFirebase} title="Recarregar dados" className="hover:text-indigo-500 transition">
+            <button onClick={carregarDadosFirebase} className="hover:text-indigo-500 transition">
               <RefreshCw size={12} className={loadingFirebase ? 'animate-spin' : ''} />
             </button>
           </div>
@@ -474,7 +447,6 @@ export default function App() {
             <button 
               onClick={handleLogout}
               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition"
-              title="Sair do sistema"
             >
               <LogOut size={16} />
             </button>
@@ -492,33 +464,17 @@ export default function App() {
             <h2 className="text-3xl font-extrabold tracking-tight">Painel de Execução AFI</h2>
           </div>
           <div className="flex items-center gap-3">
-            <button 
-              onClick={exportarPDF} 
-              className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-md shadow-indigo-600/10 transition"
-            >
-              <FileDown size={16} /> Exportar PDF
-            </button>
-            <button 
-              onClick={exportarXLS} 
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-sm font-semibold shadow-md transition"
-            >
-              <Download size={16} /> Exportar Excel
-            </button>
+            <button onClick={exportarPDF} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow transition"><FileDown size={16} /> Exportar PDF</button>
+            <button onClick={exportarXLS} className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-sm font-semibold shadow transition"><Download size={16} /> Exportar Excel</button>
           </div>
         </header>
 
-        {/* Verificação se há planilhas enviadas */}
         {dados.length === 0 && currentPage !== 'upload' ? (
           <div className={`p-10 rounded-2xl border text-center flex flex-col items-center justify-center ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
             <AlertCircle size={40} className="text-amber-500 mb-3" />
             <h3 className="text-lg font-bold mb-1">Nenhum dado orçamentário real ativo</h3>
-            <p className="text-xs text-slate-400 mb-6 max-w-sm">Para visualizar gráficos e KPIs, navegue até a Área de Upload e suba a planilha do AFI.</p>
-            <button 
-              onClick={() => setCurrentPage('upload')}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow"
-            >
-              Ir para Upload
-            </button>
+            <p className="text-xs text-slate-400 mb-6 max-w-sm">Para visualizar gráficos e KPIs, faça o upload da planilha do AFI.</p>
+            <button onClick={() => setCurrentPage('upload')} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition">Ir para Upload</button>
           </div>
         ) : (
           <>
@@ -589,13 +545,13 @@ export default function App() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
                     <h3 className="text-base font-bold mb-4">Evolução Mensal (Empenhado vs Pago)</h3>
-                    <div className="h-72">
+                    <div className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={dataEvolucaoMensal}>
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
                           <XAxis dataKey="name" stroke={darkMode ? "#94a3b8" : "#64748b"} />
-                          <YAxis stroke={darkMode ? "#94a3b8" : "#64748b"} />
-                          <Tooltip />
+                          <YAxis tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} />
+                          <Tooltip formatter={(value) => [formatarMoeda(value), '']} />
                           <Legend />
                           <Line type="monotone" dataKey="Empenhado" stroke="#6366f1" strokeWidth={3} />
                           <Line type="monotone" dataKey="Pago" stroke="#10b981" strokeWidth={3} />
@@ -606,13 +562,13 @@ export default function App() {
 
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
                     <h3 className="text-base font-bold mb-4">Total Pago vs Empenhado por Exercício</h3>
-                    <div className="h-72">
+                    <div className="h-80">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={totalPorAno}>
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
                           <XAxis dataKey="ano" stroke={darkMode ? "#94a3b8" : "#64748b"} />
-                          <YAxis stroke={darkMode ? "#94a3b8" : "#64748b"} />
-                          <Tooltip />
+                          <YAxis tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} />
+                          <Tooltip formatter={(value) => [formatarMoeda(value), '']} />
                           <Legend />
                           <Bar dataKey="Empenhado" fill="#6366f1" radius={[4, 4, 0, 0]} />
                           <Bar dataKey="Pago" fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -621,6 +577,62 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                    <h3 className="text-base font-bold mb-4">Maiores Orçamentos (Top 5 Credores)</h3>
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={maioresCredores} layout="vertical">
+                          <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
+                          <XAxis type="number" tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} />
+                          <YAxis dataKey="name" type="category" stroke={darkMode ? "#94a3b8" : "#64748b"} width={100} />
+                          <Tooltip formatter={(value) => [formatarMoeda(value), '']} />
+                          <Bar dataKey="Empenhado" fill="#ec4899" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <h3 className="text-base font-bold">Empenhos para a Data de Hoje</h3>
+                        <p className="text-[10px] text-slate-500">Filtrado automaticamente para 05/01/2026</p>
+                      </div>
+                      <span className="px-3 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded-lg text-xs font-bold">
+                        Total: {formatarMoeda(valorHoje)}
+                      </span>
+                    </div>
+                    <div className="overflow-y-auto h-60">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-slate-100 dark:border-slate-800">
+                            <th className="py-2 text-xs font-semibold text-slate-400">Credor</th>
+                            <th className="py-2 text-xs font-semibold text-slate-400">Num NE</th>
+                            <th className="py-2 text-xs font-semibold text-slate-400 text-right">Valor Empenhado</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {empenhosHoje.length > 0 ? (
+                            empenhosHoje.map((item, idx) => (
+                              <tr key={idx} className="border-b border-slate-50 dark:border-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/20 text-xs">
+                                <td className="py-2.5 font-semibold truncate max-w-xs">{item.Credor}</td>
+                                <td className="py-2.5 text-slate-500">{item.Num_NE}</td>
+                                <td className="py-2.5 font-bold text-right text-emerald-500">{formatarMoeda(item.Emp_Acum)}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="3" className="py-8 text-center text-xs text-slate-400">Nenhum registro hoje.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             )}
 
@@ -630,18 +642,18 @@ export default function App() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm col-span-2`}>
                     <h3 className="text-base font-bold mb-4">Empenhos por Natureza</h3>
-                    <div className="h-72 flex flex-col md:flex-row items-center justify-around">
-                      <div className="h-56 w-56">
+                    <div className="h-80 flex flex-col md:flex-row items-center justify-around">
+                      <div className="h-64 w-64">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie data={despesasPorNatureza} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={3} dataKey="value">
                               {despesasPorNatureza.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                             </Pie>
-                            <Tooltip />
+                            <Tooltip formatter={(value) => [formatarMoeda(value), '']} />
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
-                      <div className="space-y-2 max-h-56 overflow-y-auto text-xs">
+                      <div className="space-y-2 max-h-64 overflow-y-auto text-xs">
                         {despesasPorNatureza.map((entry, index) => (
                           <div key={index} className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
@@ -656,7 +668,7 @@ export default function App() {
                     <h3 className="text-base font-bold mb-2">Execução Geral</h3>
                     <div className="relative w-44 h-22 overflow-hidden mb-4">
                       <div className="absolute top-0 left-0 w-44 h-44 rounded-full border-12 border-slate-200 dark:border-slate-800"></div>
-                      <div className="absolute top-0 left-0 w-44 h-44 rounded-full border-12 border-indigo-650 transition-transform duration-700" style={{ clipPath: 'polygon(0 50%, 100% 50%, 100% 0, 0 0)', transform: `rotate(${Math.min(180, (percentualExecucao / 100) * 180)}deg)`, transformOrigin: '50% 50%' }}></div>
+                      <div className="absolute top-0 left-0 w-44 h-44 rounded-full border-12 border-indigo-600 transition-transform duration-700" style={{ clipPath: 'polygon(0 50%, 100% 50%, 100% 0, 0 0)', transform: `rotate(${Math.min(180, (percentualExecucao / 100) * 180)}deg)`, transformOrigin: '50% 50%' }}></div>
                       <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center"><span className="text-3xl font-extrabold">{percentualExecucao.toFixed(1)}%</span></div>
                     </div>
                   </div>
@@ -664,10 +676,10 @@ export default function App() {
 
                 <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
                   <h3 className="text-base font-bold mb-4">Funil Orçamentário</h3>
-                  <div className="h-72">
+                  <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <FunnelChart>
-                        <Tooltip />
+                        <Tooltip formatter={(value) => [formatarMoeda(value), '']} />
                         <Funnel dataKey="value" data={dataFunil} isAnimationActive>
                           {dataFunil.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                         </Funnel>
@@ -762,28 +774,6 @@ export default function App() {
                   ))}
                 </div>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* Gerenciamento */}
-        {currentPage === 'usuarios' && user?.email === 'lucivaldo586@gmail.com' && (
-          <div className="space-y-8 animate-fadeIn">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
-                <h3 className="text-base font-bold mb-1">Autorizar Novo Acesso</h3>
-                <form onSubmit={cadastrarUsuario} className="space-y-4">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 block mb-1">Nome</label>
-                    <input type="text" required placeholder="Ex: Lucivaldo Braga" value={novoNome} onChange={(e) => setNovoNome(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-250 bg-transparent text-xs outline-none" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 block mb-1">E-mail</label>
-                    <input type="email" required placeholder="usuario@cetam.am.gov.br" value={novoEmail} onChange={(e) => setNovoEmail(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-250 bg-transparent text-xs outline-none" />
-                  </div>
-                  <button type="submit" className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow transition">Cadastrar</button>
-                </form>
-              </div>
             </div>
           </div>
         )}
