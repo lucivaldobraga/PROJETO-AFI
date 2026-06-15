@@ -823,14 +823,68 @@ export default function App() {
   };
 
   // Gráficos
-  const dataEvolucaoMensal = [
-    { name: 'Jan', Empenhado: totais.empAcum * 0.2, Pago: totais.pagoAcum * 0.15 },
-    { name: 'Fev', Empenhado: totais.empAcum * 0.4, Pago: totais.pagoAcum * 0.35 },
-    { name: 'Mar', Empenhado: totais.empAcum * 0.6, Pago: totais.pagoAcum * 0.55 },
-    { name: 'Abr', Empenhado: totais.empAcum * 0.8, Pago: totais.pagoAcum * 0.70 },
-    { name: 'Mai', Empenhado: totais.empAcum * 0.9, Pago: totais.pagoAcum * 0.85 },
-    { name: 'Jun', Empenhado: totais.empAcum, Pago: totais.pagoAcum }
-  ];
+  const dataEvolucaoMensal = (() => {
+    const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    
+    // Inicializar os valores de cada mês com 0
+    const valoresPorMes = mesesNomes.map(nome => ({
+      name: nome,
+      Empenhado: 0,
+      Pago: 0
+    }));
+
+    // Agrupar os valores reais de cada empenho no mês de sua emissão
+    dadosFiltrados.forEach(item => {
+      if (!item.Data_Emis) return;
+      const parts = item.Data_Emis.includes('/') 
+        ? item.Data_Emis.split('/') 
+        : item.Data_Emis.split('-');
+        
+      if (parts.length === 3) {
+        let mesStr = '';
+        if (parts[0].length === 4) {
+          mesStr = parts[1]; // YYYY-MM-DD
+        } else if (parts[2].length === 4) {
+          mesStr = parts[1]; // DD/MM/YYYY
+        } else {
+          mesStr = parts[1];
+        }
+        
+        const mesIndex = parseInt(mesStr, 10) - 1; // 0 a 11
+        if (mesIndex >= 0 && mesIndex < 12) {
+          valoresPorMes[mesIndex].Empenhado += item.Emp_Acum || 0;
+          valoresPorMes[mesIndex].Pago += item.Pago_Acum || 0;
+        }
+      }
+    });
+
+    // Fazer a soma acumulada de Janeiro até Dezembro
+    let acumuladoEmp = 0;
+    let acumuladoPago = 0;
+    
+    const evolucaoAcumulada = valoresPorMes.map(m => {
+      acumuladoEmp += m.Empenhado;
+      acumuladoPago += m.Pago;
+      return {
+        name: m.name,
+        Empenhado: acumuladoEmp,
+        Pago: acumuladoPago
+      };
+    });
+
+    // Descobrir o último mês que tem dados reais de emissão
+    let ultimoMesComDados = 0;
+    for (let i = 0; i < 12; i++) {
+      if (valoresPorMes[i].Empenhado > 0 || valoresPorMes[i].Pago > 0) {
+        ultimoMesComDados = i;
+      }
+    }
+
+    // Exibir pelo menos até Junho (índice 5) para manter consistência visual mínima de 6 meses,
+    // ou até o último mês que contiver dados reais se for posterior.
+    const limiteIndex = Math.max(5, ultimoMesComDados);
+    return evolucaoAcumulada.slice(0, limiteIndex + 1);
+  })();
 
   const despesasPorNatureza = (() => {
     const raw = dadosFiltrados.reduce((acc, item) => {
