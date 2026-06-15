@@ -250,20 +250,20 @@ export default function App() {
       setUsuariosAutorizados(prev => prev.map(u =>
         u.email === editingEmail ? { ...u, name: novoNome, email: novoEmail, password: novaSenha, role: novoCargo, setor: novoSetor } : u
       ));
-      
+
       // Se for o próprio usuário logado se editando, atualiza a sessão local
       if (user && user.email.toLowerCase() === editingEmail.toLowerCase()) {
-        const updatedUser = { 
-          email: novoEmail, 
-          name: novoNome, 
-          role: novoCargo, 
+        const updatedUser = {
+          email: novoEmail,
+          name: novoNome,
+          role: novoCargo,
           setor: novoSetor,
-          password: novaSenha 
+          password: novaSenha
         };
         localStorage.setItem('afi_user', JSON.stringify(updatedUser));
         setUser(updatedUser);
       }
-      
+
       customAlert("Sucesso", `Usuário ${novoNome} atualizado com sucesso!`, "success");
       setEditingEmail(null);
     } else {
@@ -554,7 +554,7 @@ export default function App() {
 
   const exportarPDF = async () => {
     setExportandoPDF(true);
-    
+
     // Alerta customizado de início
     const loadingAlert = document.createElement('div');
     loadingAlert.style.position = 'fixed';
@@ -574,16 +574,16 @@ export default function App() {
 
     try {
       const pdf = new jsPDF('p', 'mm', 'a4');
-      
+
       const drawHeader = (titulo, pageNum, totalPages) => {
         // Cor de fundo geral do relatório baseada no tema
         pdf.setFillColor(255, 255, 255); // Usar branco no PDF para impressão profissional
         pdf.rect(0, 0, 210, 297, 'F');
-        
+
         // Cabeçalho institucional (faixa superior)
         pdf.setFillColor(79, 70, 229); // indigo-600
         pdf.rect(0, 0, 210, 22, 'F');
-        
+
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(11);
         pdf.setTextColor(255, 255, 255);
@@ -591,18 +591,18 @@ export default function App() {
         pdf.setFont("helvetica", "normal");
         pdf.setFontSize(8);
         pdf.text("DAF - DIRETORIA ADMINISTRATIVO FINANCEIRA", 12, 15);
-        
+
         // Linha divisória
         pdf.setDrawColor(229, 231, 235);
         pdf.setLineWidth(0.5);
         pdf.line(10, 36, 200, 36);
-        
+
         // Título da Página
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(13);
         pdf.setTextColor(15, 23, 42); // slate-900
         pdf.text(titulo, 12, 30);
-        
+
         // Rodapé
         pdf.setFont("helvetica", "normal");
         pdf.setFontSize(8);
@@ -624,10 +624,10 @@ export default function App() {
 
       if (currentPage === 'dashboard') {
         const totalPaginas = 3;
-        
+
         // PAGINA 1: Resumo Executivo e KPIs
         drawHeader("RELATÓRIO DE EXECUÇÃO ORÇAMENTÁRIA - RESUMO", 1, totalPaginas);
-        
+
         // Escrever Metadados dos Filtros
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(9);
@@ -659,19 +659,19 @@ export default function App() {
         kpisData.forEach((row, idx) => {
           pdf.setFillColor(idx % 2 === 0 ? 249 : 243, idx % 2 === 0 ? 250 : 244, idx % 2 === 0 ? 251 : 246);
           pdf.rect(12, currY, 186, 8, 'F');
-          
+
           pdf.setFont("helvetica", "bold");
           pdf.setFontSize(8);
           pdf.setTextColor(31, 41, 55);
           pdf.text(row.name, 15, currY + 5.5);
-          
+
           pdf.setFont("helvetica", "normal");
           pdf.text(row.mes > 0 ? formatarMoeda(row.mes) : "-", 85, currY + 5.5);
-          
+
           pdf.setFont("helvetica", "bold");
           pdf.setTextColor(row.color[0], row.color[1], row.color[2]);
           pdf.text(formatarMoeda(row.acum), 145, currY + 5.5);
-          
+
           currY += 8;
         });
 
@@ -789,7 +789,7 @@ export default function App() {
       }
 
       pdf.save(`relatorio_${currentPage}_${filtroAno}.pdf`);
-      
+
       // Remover alerta
       if (loadingAlert.parentNode) {
         loadingAlert.parentNode.removeChild(loadingAlert);
@@ -1143,7 +1143,7 @@ export default function App() {
                       <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.empMes)}</p>
                     </div>
                     <div className={`p-5 border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center flex-1`}>
-                      <span className="text-xs font-semibold text-slate-400">Empenhado Mês (Acumulado)</span>
+                      <span className="text-xs font-semibold text-slate-400">Empenhado até o Mês (Acumulado)</span>
                       <p className="text-xl font-extrabold tracking-tight mt-1 text-indigo-500">{formatarMoeda(totais.empAcum)}</p>
                     </div>
                   </div>
@@ -1155,7 +1155,7 @@ export default function App() {
                       <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.pagoMes)}</p>
                     </div>
                     <div className={`p-5 border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center flex-1`}>
-                      <span className="text-xs font-semibold text-slate-400">Pago Mês (Acumulado)</span>
+                      <span className="text-xs font-semibold text-slate-400">Pago até o Mês (Acumulado)</span>
                       <p className="text-xl font-extrabold tracking-tight mt-1 text-emerald-500">{formatarMoeda(totais.pagoAcum)}</p>
                     </div>
                   </div>
@@ -1167,7 +1167,7 @@ export default function App() {
                       <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.liqMes)}</p>
                     </div>
                     <div className={`p-5 border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center flex-1`}>
-                      <span className="text-xs font-semibold text-slate-400">Liquidado Mês (Acumulado)</span>
+                      <span className="text-xs font-semibold text-slate-400">Liquidado até o Mês (Acumulado)</span>
                       <p className="text-xl font-extrabold tracking-tight mt-1 text-purple-500">{formatarMoeda(totais.liqAcum)}</p>
                     </div>
                   </div>
@@ -1428,13 +1428,13 @@ export default function App() {
                       <div className="h-64 w-full md:w-3/5" id="grafico-natureza">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
-                            <Pie 
-                              data={despesasPorNatureza} 
-                              cx="50%" 
-                              cy="50%" 
-                              innerRadius={45} 
-                              outerRadius={65} 
-                              paddingAngle={3} 
+                            <Pie
+                              data={despesasPorNatureza}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={45}
+                              outerRadius={65}
+                              paddingAngle={3}
                               dataKey="value"
                               label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
                                 const RADIAN = Math.PI / 180;
@@ -1459,9 +1459,9 @@ export default function App() {
                               {despesasPorNatureza.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                             </Pie>
                             <Tooltip formatter={(value) => [formatarMoeda(value), '']} />
-                            <Legend 
-                              verticalAlign="bottom" 
-                              height={32} 
+                            <Legend
+                              verticalAlign="bottom"
+                              height={32}
                               iconType="circle"
                               iconSize={6}
                               formatter={(value) => (
@@ -1757,7 +1757,7 @@ export default function App() {
                         {setores.map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                     </div>
-                    
+
                     {/* Campo para cadastrar novo setor */}
                     <div className="flex gap-2">
                       <input
