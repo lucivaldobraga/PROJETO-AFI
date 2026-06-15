@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
-  PieChart, Pie, Cell, FunnelChart, Funnel 
+import {
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, FunnelChart, Funnel
 } from 'recharts';
-import { 
-  LayoutDashboard, TrendingUp, AlertTriangle, Upload, Users, LogOut, Sun, Moon, Search, 
+import {
+  LayoutDashboard, TrendingUp, AlertTriangle, Upload, Users, LogOut, Sun, Moon, Search,
   Download, FileSpreadsheet, Plus, ShieldCheck, FileDown, AlertCircle, RefreshCw, Trash2,
   ChevronDown, X
 } from 'lucide-react';
@@ -43,14 +43,14 @@ function SearchableDropdown({ label, value, onChange, options, placeholder, dark
   const filteredOptions = React.useMemo(() => {
     const cleanTerm = searchTerm.toLowerCase().trim();
     const baseOptions = options.filter(opt => opt && opt !== 'Todos');
-    
+
     let matches = baseOptions;
     if (cleanTerm) {
-      matches = baseOptions.filter(opt => 
+      matches = baseOptions.filter(opt =>
         String(opt).toLowerCase().includes(cleanTerm)
       );
     }
-    
+
     return ['Todos', ...matches.slice(0, 100)];
   }, [options, searchTerm]);
 
@@ -81,24 +81,23 @@ function SearchableDropdown({ label, value, onChange, options, placeholder, dark
           onChange={handleInputChange}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder || "Pesquisar..."}
-          className={`w-full pl-3 pr-8 py-2 rounded-xl border outline-none text-xs transition ${
-            darkMode 
-              ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500 placeholder-slate-600' 
-              : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-indigo-500 placeholder-slate-400'
-          }`}
+          className={`w-full pl-3 pr-8 py-2 rounded-xl border outline-none text-xs transition ${darkMode
+            ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500 placeholder-slate-600'
+            : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-indigo-500 placeholder-slate-400'
+            }`}
         />
         <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5">
           {searchTerm && (
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={() => handleSelectOption('Todos')}
               className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
             >
               <X size={12} />
             </button>
           )}
-          <ChevronDown 
-            size={14} 
+          <ChevronDown
+            size={14}
             className={`text-slate-400 transition-transform cursor-pointer ${isOpen ? 'rotate-180' : ''}`}
             onClick={() => setIsOpen(!isOpen)}
           />
@@ -106,11 +105,10 @@ function SearchableDropdown({ label, value, onChange, options, placeholder, dark
       </div>
 
       {isOpen && (
-        <ul className={`absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border shadow-lg text-xs ${
-          darkMode 
-            ? 'bg-slate-950 border-slate-800 text-white divide-y divide-slate-850' 
-            : 'bg-white border-slate-200 text-slate-800 divide-y divide-slate-105'
-        }`}>
+        <ul className={`absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border shadow-lg text-xs ${darkMode
+          ? 'bg-slate-950 border-slate-800 text-white divide-y divide-slate-850'
+          : 'bg-white border-slate-200 text-slate-800 divide-y divide-slate-105'
+          }`}>
           {filteredOptions.length === 0 ? (
             <li className="px-3 py-2 text-slate-400 italic">Nenhum resultado</li>
           ) : (
@@ -118,11 +116,10 @@ function SearchableDropdown({ label, value, onChange, options, placeholder, dark
               <li
                 key={opt}
                 onClick={() => handleSelectOption(opt)}
-                className={`px-3 py-2 cursor-pointer transition-colors break-words ${
-                  value === opt
-                    ? (darkMode ? 'bg-indigo-600/30 text-indigo-400 font-semibold' : 'bg-indigo-50 text-indigo-600 font-semibold')
-                    : (darkMode ? 'hover:bg-slate-900 text-slate-200' : 'hover:bg-slate-50 text-slate-700')
-                }`}
+                className={`px-3 py-2 cursor-pointer transition-colors break-words ${value === opt
+                  ? (darkMode ? 'bg-indigo-600/30 text-indigo-400 font-semibold' : 'bg-indigo-50 text-indigo-600 font-semibold')
+                  : (darkMode ? 'hover:bg-slate-900 text-slate-200' : 'hover:bg-slate-50 text-slate-700')
+                  }`}
               >
                 {opt === 'Todos' ? 'Todos' : opt}
               </li>
@@ -141,18 +138,18 @@ export default function App() {
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
   const [user, setUser] = useState(null);
-  
+
   // Dados Reais da Planilha
   const [dados, setDados] = useState([]);
   const [arquivos, setArquivos] = useState([]);
   const [loadingFirebase, setLoadingFirebase] = useState(false);
-  
+
   const [usuariosAutorizados, setUsuariosAutorizados] = useState(() => {
     const stored = localStorage.getItem('afi_usuarios');
     if (stored) {
       try {
         return JSON.parse(stored);
-      } catch (e) {}
+      } catch (e) { }
     }
     return [
       { email: 'lucivaldo586@gmail.com', name: 'Lucivaldo Braga', role: 'admin', password: 'admin123' }
@@ -164,7 +161,7 @@ export default function App() {
   }, [usuariosAutorizados]);
 
   // Estados Globais, Filtros e Temas
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+  const [darkMode, setDarkMode] = useState(true);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [busca, setBusca] = useState('');
   const [filtroAno, setFiltroAno] = useState('Todos');
@@ -218,9 +215,9 @@ export default function App() {
   const cadastrarUsuario = (e) => {
     e.preventDefault();
     if (!novoEmail || !novoNome || !novaSenha) return;
-    
+
     if (editingEmail) {
-      setUsuariosAutorizados(prev => prev.map(u => 
+      setUsuariosAutorizados(prev => prev.map(u =>
         u.email === editingEmail ? { ...u, name: novoNome, email: novoEmail, password: novaSenha, role: novoCargo, setor: novoSetor } : u
       ));
       customAlert("Sucesso", `Usuário ${novoNome} atualizado com sucesso!`, "success");
@@ -233,7 +230,7 @@ export default function App() {
       setUsuariosAutorizados(prev => [...prev, { email: novoEmail, name: novoNome, password: novaSenha, role: novoCargo, setor: novoSetor }]);
       customAlert("Sucesso", `Usuário ${novoNome} cadastrado com sucesso!`, "success");
     }
-    
+
     setNovoEmail('');
     setNovoNome('');
     setNovaSenha('');
@@ -256,8 +253,8 @@ export default function App() {
       return;
     }
     customConfirm(
-      "Remover Usuário", 
-      `Deseja realmente remover o acesso do usuário ${email}?`, 
+      "Remover Usuário",
+      `Deseja realmente remover o acesso do usuário ${email}?`,
       () => {
         setUsuariosAutorizados(prev => prev.filter(u => u.email !== email));
       }
@@ -299,22 +296,17 @@ export default function App() {
     }
   };
 
-  // Alternador de tema Claro/Escuro
+  // Forçar tema escuro permanentemente
   useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [darkMode]);
+    document.documentElement.classList.add('dark');
+    localStorage.setItem('theme', 'dark');
+  }, []);
 
   // Login
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError('');
-    
+
     // Validar usuário na lista local/sandbox primeiro
     const usuarioExiste = usuariosAutorizados.find(u => u.email === emailInput);
     if (usuarioExiste && usuarioExiste.password === passwordInput) {
@@ -345,7 +337,7 @@ export default function App() {
     const files = e.target.files;
     if (files.length === 0) return;
     const file = files[0];
-    
+
     setLoadingFirebase(true);
     try {
       const reader = new FileReader();
@@ -353,13 +345,13 @@ export default function App() {
         try {
           const fileBuffer = evt.target.result;
           const registros = tratarRelatorioAfi(fileBuffer);
-          
+
           if (registros.length === 0) {
             customAlert("Erro", "Nenhum registro encontrado ou formato de planilha inválido.", "error");
             setLoadingFirebase(false);
             return;
           }
-          
+
           await firebaseService.adicionarRegistros(registros, file.name);
           customAlert("Sucesso", `Planilha processada com sucesso! ${registros.length} empenhos importados.`, "success");
           await carregarDadosFirebase();
@@ -378,7 +370,7 @@ export default function App() {
 
   const handleDeletarArquivo = async (nomeOriginal) => {
     customConfirm(
-      "Remover Arquivo", 
+      "Remover Arquivo",
       `Tem certeza que deseja remover o arquivo "${nomeOriginal}" e todos os seus empenhos do sistema?`,
       async () => {
         setLoadingFirebase(true);
@@ -397,7 +389,7 @@ export default function App() {
   // Filtragem dos dados reais
   const dadosFiltrados = dados.filter(item => {
     const termo = busca.toLowerCase();
-    const bateBusca = 
+    const bateBusca =
       item.Credor.toLowerCase().includes(termo) ||
       item.Num_NE.toLowerCase().includes(termo) ||
       item.Processo.toLowerCase().includes(termo) ||
@@ -426,13 +418,13 @@ export default function App() {
     const mes = String(hojeSistema.getMonth() + 1).padStart(2, '0');
     const ano = hojeSistema.getFullYear();
     const dataFormatada = `${dia}/${mes}/${ano}`;
-    
+
     const temDadosHoje = dados.some(item => item.Data_Emis === dataFormatada);
     if (temDadosHoje) return dataFormatada;
-    
+
     const temDadosExemplo = dados.some(item => item.Data_Emis === '05/01/2026');
     if (temDadosExemplo) return '05/01/2026';
-    
+
     if (dados.length > 0) {
       const datasValidas = dados
         .filter(item => item.Data_Emis && item.Data_Emis.includes('/'))
@@ -444,7 +436,7 @@ export default function App() {
           };
         })
         .filter(x => !isNaN(x.date.getTime()));
-      
+
       if (datasValidas.length > 0) {
         datasValidas.sort((a, b) => b.date - a.date);
         return datasValidas[0].original;
@@ -498,11 +490,11 @@ export default function App() {
     const input = document.getElementById('dashboard-view');
     document.body.classList.add('exporting-pdf');
     setExportandoPDF(true);
-    
+
     // Pequeno atraso para a interface ocultar os botões/filtros
     setTimeout(() => {
-      html2canvas(input, { 
-        scale: 2, 
+      html2canvas(input, {
+        scale: 2,
         useCORS: true,
         backgroundColor: darkMode ? '#020617' : '#f8fafc'
       }).then((canvas) => {
@@ -634,9 +626,9 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100">
         <div className="w-full max-w-md p-8 rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl shadow-indigo-500/5">
           <div className="flex flex-col items-center mb-8">
-            <img 
-              src="/logo.png" 
-              alt="Logo CETAM" 
+            <img
+              src="/logo.png"
+              alt="Logo CETAM"
               className="w-16 h-16 rounded-2xl object-contain shadow-xl shadow-indigo-600/10 mb-3"
             />
             <h2 className="text-2xl font-bold tracking-tight">Painel AFI Orçamentos</h2>
@@ -651,8 +643,8 @@ export default function App() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="text-xs font-semibold text-slate-400 block mb-1">E-mail</label>
-              <input 
-                type="email" 
+              <input
+                type="email"
                 required
                 placeholder="lucivaldo586@gmail.com"
                 value={emailInput}
@@ -663,8 +655,8 @@ export default function App() {
 
             <div>
               <label className="text-xs font-semibold text-slate-400 block mb-1">Senha</label>
-              <input 
-                type="password" 
+              <input
+                type="password"
                 required
                 placeholder="••••••••"
                 value={passwordInput}
@@ -673,7 +665,7 @@ export default function App() {
               />
             </div>
 
-            <button 
+            <button
               type="submit"
               className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow"
             >
@@ -687,14 +679,14 @@ export default function App() {
 
   return (
     <div className={`min-h-screen flex transition-colors duration-300 ${darkMode ? 'custom-bg-dark text-slate-100' : 'custom-bg-light text-slate-800'}`}>
-      
+
       {/* Sidebar Fixo Lateral */}
       <aside className={`w-72 flex-shrink-0 border-r ${darkMode ? 'custom-sidebar-dark text-slate-200' : 'custom-sidebar-light text-slate-800'} p-6 flex flex-col justify-between`}>
         <div>
           <div className="flex items-center gap-3 mb-10">
-            <img 
-              src="/logo.png" 
-              alt="Logo CETAM" 
+            <img
+              src="/logo.png"
+              alt="Logo CETAM"
               className="w-10 h-10 rounded-xl object-contain shadow-md"
             />
             <div>
@@ -704,32 +696,32 @@ export default function App() {
           </div>
 
           <nav className="space-y-1">
-            <button 
+            <button
               onClick={() => setCurrentPage('dashboard')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
             >
               <LayoutDashboard size={18} /> Dashboard Geral
             </button>
-            <button 
+            <button
               onClick={() => setCurrentPage('avancados')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'avancados' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
             >
               <TrendingUp size={18} /> Visuais Avançados
             </button>
-            <button 
+            <button
               onClick={() => setCurrentPage('auditoria')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'auditoria' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
             >
               <AlertTriangle size={18} /> Matriz de Gargalos
             </button>
-            <button 
+            <button
               onClick={() => setCurrentPage('upload')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'upload' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
             >
               <Upload size={18} /> Upload e Histórico
             </button>
             {user?.email === 'lucivaldo586@gmail.com' && (
-              <button 
+              <button
                 onClick={() => setCurrentPage('usuarios')}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'usuarios' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
               >
@@ -747,15 +739,7 @@ export default function App() {
             </button>
           </div>
 
-          <div className={`flex items-center justify-between p-1.5 rounded-xl ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
-            <span className="text-xs font-semibold px-2 text-slate-400">Tema</span>
-            <button 
-              onClick={() => setDarkMode(!darkMode)}
-              className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-md"
-            >
-              {darkMode ? <Sun size={14} /> : <Moon size={14} />}
-            </button>
-          </div>
+
 
           <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -767,8 +751,8 @@ export default function App() {
                 <span className="text-[10px] text-slate-400 truncate block">Administrador</span>
               </div>
             </div>
-            
-            <button 
+
+            <button
               onClick={handleLogout}
               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition"
             >
@@ -780,12 +764,12 @@ export default function App() {
 
       {/* Conteúdo Principal */}
       <main className="flex-1 overflow-y-auto p-10 font-sans" id="dashboard-view">
-        
+
         {/* Topbar Header */}
         <header className="flex justify-between items-center mb-8">
           <div>
-            <span className="text-xs font-bold text-slate-400 tracking-widest uppercase">CETAM - Amazonas</span>
-            <h2 className="text-3xl font-extrabold tracking-tight">Painel de Execução AFI</h2>
+            <span className="text-xs font-bold text-slate-400 tracking-widest uppercase">DAF - DIRETORIA ADMINISTRATIVO FINANCEIRO</span>
+            <h2 className="text-3xl font-extrabold tracking-tight">Painel de Execução Orçamentárias </h2>
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto hide-in-pdf">
             {!exportandoPDF && (
@@ -798,8 +782,8 @@ export default function App() {
         {dados.length === 0 && currentPage !== 'upload' && currentPage !== 'usuarios' ? (
           <div className={`p-10 rounded-2xl border text-center flex flex-col items-center justify-center ${darkMode ? 'custom-card-dark' : 'custom-card-light'}`}>
             <AlertCircle size={40} className="text-amber-500 mb-3" />
-            <h3 className="text-lg font-bold mb-1">Nenhum dado orçamentário real ativo</h3>
-            <p className="text-xs text-slate-400 mb-6 max-w-sm">Para visualizar gráficos e KPIs, faça o upload da planilha do AFI.</p>
+            <h3 className="text-lg font-bold mb-1">Nenhum dado orçamentário ativo</h3>
+            <p className="text-xs text-slate-400 mb-6 max-w-sm">Para visualizar gráficos e KPIs, faça o upload da planilha extraída do AFI, em extensão .xls ou .xlsx</p>
             <button onClick={() => setCurrentPage('upload')} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition">Ir para Upload</button>
           </div>
         ) : (
@@ -807,14 +791,14 @@ export default function App() {
             {/* Dashboard Geral */}
             {currentPage === 'dashboard' && (
               <div className="space-y-8 animate-fadeIn">
-                
+
                 <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm space-y-4`}>
                   {/* Busca Geral */}
                   <div className="relative">
                     <Search className="absolute left-4 top-3 text-slate-400" size={16} />
-                    <input 
-                      type="text" 
-                      placeholder="Pesquisa geral em Credor, NE, Processo, Natureza ou UO..." 
+                    <input
+                      type="text"
+                      placeholder="Pesquisa geral em Credor, NE, Processo, Natureza ou UO..."
                       value={busca}
                       onChange={(e) => setBusca(e.target.value)}
                       className={`w-full pl-11 pr-4 py-2.5 rounded-xl border outline-none text-sm transition ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500 placeholder-slate-600' : 'bg-slate-50 border-slate-200 focus:border-indigo-500 placeholder-slate-400'}`}
@@ -826,8 +810,8 @@ export default function App() {
                     {/* Exercício */}
                     <div className="flex flex-col text-left">
                       <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Exercício</label>
-                      <select 
-                        value={filtroAno} 
+                      <select
+                        value={filtroAno}
                         onChange={(e) => setFiltroAno(e.target.value)}
                         className={`w-full px-3 py-2 rounded-xl border outline-none text-xs transition ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
                       >
@@ -925,7 +909,7 @@ export default function App() {
                         </span>
                       </div>
                       <p className="text-[10px] text-slate-400 mb-6">Detalhamento dos valores liberados e empenhados na data atual de processamento.</p>
-                      
+
                       <div className="space-y-4">
                         <div className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
                           <span className="text-xs text-slate-400">Total Pago Hoje</span>
@@ -964,16 +948,16 @@ export default function App() {
                             <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#1e293b" : "#e2e8f0"} />
                             <XAxis type="number" tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
                             <YAxis dataKey="name" type="category" stroke={darkMode ? "#94a3b8" : "#64748b"} width={170} style={{ fontSize: '9px', fontFamily: 'Outfit, sans-serif' }} />
-                            <Tooltip 
-                              contentStyle={{ 
-                                backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: darkMode ? '#0f172a' : '#ffffff',
                                 borderColor: darkMode ? '#1e293b' : '#e2e8f0',
                                 borderRadius: '12px',
                                 fontFamily: 'Outfit, sans-serif',
                                 fontSize: '11px',
                                 color: darkMode ? '#f8fafc' : '#0f172a'
                               }}
-                              formatter={(value) => [formatarMoeda(value), '']} 
+                              formatter={(value) => [formatarMoeda(value), '']}
                             />
                             <Legend wrapperStyle={{ fontFamily: 'Outfit, sans-serif', fontSize: '10px' }} />
                             <Bar dataKey="Empenhado" fill="#6366f1" radius={[0, 4, 4, 0]} />
@@ -994,7 +978,7 @@ export default function App() {
                       <h3 className="text-base font-extrabold tracking-tight">Detalhamento dos Empenhos do Dia</h3>
                       <span className="text-[10px] text-slate-400 font-semibold">Movimentações de Hoje ({dataHojeRef})</span>
                     </div>
-                    
+
                     <div className="overflow-x-auto max-h-60 overflow-y-auto">
                       <table className="w-full text-left">
                         <thead>
@@ -1036,16 +1020,16 @@ export default function App() {
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
                           <XAxis dataKey="name" stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
                           <YAxis tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: darkMode ? '#0f172a' : '#ffffff',
                               borderColor: darkMode ? '#1e293b' : '#e2e8f0',
                               borderRadius: '12px',
                               fontFamily: 'Outfit, sans-serif',
                               fontSize: '11px',
                               color: darkMode ? '#f8fafc' : '#0f172a'
                             }}
-                            formatter={(value) => [formatarMoeda(value), '']} 
+                            formatter={(value) => [formatarMoeda(value), '']}
                           />
                           <Legend wrapperStyle={{ fontFamily: 'Outfit, sans-serif', fontSize: '11px' }} />
                           <Line type="monotone" dataKey="Empenhado" stroke="#6366f1" strokeWidth={3} />
@@ -1063,16 +1047,16 @@ export default function App() {
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
                           <XAxis dataKey="ano" stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
                           <YAxis tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: darkMode ? '#0f172a' : '#ffffff',
                               borderColor: darkMode ? '#1e293b' : '#e2e8f0',
                               borderRadius: '12px',
                               fontFamily: 'Outfit, sans-serif',
                               fontSize: '11px',
                               color: darkMode ? '#f8fafc' : '#0f172a'
                             }}
-                            formatter={(value) => [formatarMoeda(value), '']} 
+                            formatter={(value) => [formatarMoeda(value), '']}
                           />
                           <Legend wrapperStyle={{ fontFamily: 'Outfit, sans-serif', fontSize: '11px' }} />
                           <Bar dataKey="Empenhado" fill="#6366f1" radius={[4, 4, 0, 0]} />
@@ -1092,16 +1076,16 @@ export default function App() {
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
                           <XAxis type="number" tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
                           <YAxis dataKey="name" type="category" stroke={darkMode ? "#94a3b8" : "#64748b"} width={170} style={{ fontSize: '9px', fontFamily: 'Outfit, sans-serif' }} />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: darkMode ? '#0f172a' : '#ffffff',
                               borderColor: darkMode ? '#1e293b' : '#e2e8f0',
                               borderRadius: '12px',
                               fontFamily: 'Outfit, sans-serif',
                               fontSize: '11px',
                               color: darkMode ? '#f8fafc' : '#0f172a'
                             }}
-                            formatter={(value) => [formatarMoeda(value), '']} 
+                            formatter={(value) => [formatarMoeda(value), '']}
                           />
                           <Bar dataKey="Empenhado" fill="#ec4899" radius={[0, 4, 4, 0]} />
                         </BarChart>
@@ -1117,16 +1101,16 @@ export default function App() {
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
                           <XAxis dataKey="name" stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '9px', fontFamily: 'Outfit, sans-serif' }} />
                           <YAxis tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: darkMode ? '#0f172a' : '#ffffff',
                               borderColor: darkMode ? '#1e293b' : '#e2e8f0',
                               borderRadius: '12px',
                               fontFamily: 'Outfit, sans-serif',
                               fontSize: '11px',
                               color: darkMode ? '#f8fafc' : '#0f172a'
                             }}
-                            formatter={(value) => [formatarMoeda(value), '']} 
+                            formatter={(value) => [formatarMoeda(value), '']}
                           />
                           <Legend wrapperStyle={{ fontFamily: 'Outfit, sans-serif', fontSize: '11px' }} />
                           <Bar dataKey="Empenhado" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
@@ -1215,12 +1199,12 @@ export default function App() {
               const dadosAuditoria = dadosFiltrados.filter(item => {
                 const bateCredor = item.Credor.toLowerCase().includes(buscaAuditoriaCredor.toLowerCase());
                 const bateNE = item.Num_NE.toLowerCase().includes(buscaAuditoriaNE.toLowerCase());
-                
+
                 const riscoGargalo = item.A_Pagar > 50000 || item.A_Liquidar > 100000;
-                const bateStatus = filtroAuditoriaStatus === 'Todos' || 
+                const bateStatus = filtroAuditoriaStatus === 'Todos' ||
                   (filtroAuditoriaStatus === 'Gargalo' && riscoGargalo) ||
                   (filtroAuditoriaStatus === 'Seguro' && !riscoGargalo);
-                  
+
                 return bateCredor && bateNE && bateStatus;
               });
 
@@ -1229,12 +1213,12 @@ export default function App() {
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <h3 className="text-base font-bold mb-1">Matriz de Gargalos e Auditoria</h3>
                     <p className="text-xs text-slate-500 mb-6">Detalhamento dos Credores com empenhos sob risco ou gargalo de pagamento.</p>
-                    
+
                     {/* Filtros específicos de Auditoria */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 hide-in-pdf">
                       <div>
                         <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Buscar Credor</label>
-                        <input 
+                        <input
                           type="text"
                           placeholder="Filtrar por nome do Credor..."
                           value={buscaAuditoriaCredor}
@@ -1244,7 +1228,7 @@ export default function App() {
                       </div>
                       <div>
                         <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Buscar NE</label>
-                        <input 
+                        <input
                           type="text"
                           placeholder="Filtrar por número da NE..."
                           value={buscaAuditoriaNE}
@@ -1317,7 +1301,7 @@ export default function App() {
               </div>
               <h3 className="text-base font-bold mb-1">Importar Relatório Orçamentário (AFI)</h3>
               <p className="text-xs text-slate-400 mb-6 max-w-sm">Envie arquivos no formato original <span className="font-semibold text-indigo-500">.xls</span> ou <span className="font-semibold text-indigo-500">.xlsx</span> do AFI.</p>
-              
+
               <label className="cursor-pointer px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow">
                 Escolher Arquivo Bruto
                 <input type="file" accept=".xls,.xlsx" className="hidden" onChange={handleUploadReal} />
@@ -1341,7 +1325,7 @@ export default function App() {
                           <span className="text-[10px] text-slate-500 dark:text-slate-400">{arq.total_linhas} linhas extraídas • {arq.processado_em}</span>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-2">
                         <button onClick={exportarXLS} className="p-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition" title="Baixar"><Download size={14} /></button>
                         <button onClick={() => handleDeletarArquivo(arq.nome_original)} className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/30 dark:text-rose-400 transition" title="Remover"><Trash2 size={14} /></button>
@@ -1358,16 +1342,16 @@ export default function App() {
         {currentPage === 'usuarios' && user?.email === 'lucivaldo586@gmail.com' && (
           <div className="space-y-8 animate-fadeIn">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              
+
               <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                 <h3 className="text-base font-bold mb-1">{editingEmail ? 'Editar Usuário' : 'Autorizar Novo Acesso'}</h3>
                 <p className="text-xs text-slate-500 mb-6">Cadastre ou edite credenciais de acesso locais ao painel.</p>
-                
+
                 <form onSubmit={cadastrarUsuario} className="space-y-4">
                   <div>
                     <label className="text-xs font-semibold text-slate-400 block mb-1">Nome Completo</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
                       placeholder="Ex: Lucivaldo Braga"
                       value={novoNome}
@@ -1375,11 +1359,11 @@ export default function App() {
                       className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
                     />
                   </div>
-                  
+
                   <div>
                     <label className="text-xs font-semibold text-slate-400 block mb-1">E-mail</label>
-                    <input 
-                      type="email" 
+                    <input
+                      type="email"
                       required
                       placeholder="usuario@cetam.am.gov.br"
                       value={novoEmail}
@@ -1390,8 +1374,8 @@ export default function App() {
 
                   <div>
                     <label className="text-xs font-semibold text-slate-400 block mb-1">Senha de Acesso</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
                       placeholder="Senha do usuário"
                       value={novaSenha}
@@ -1402,8 +1386,8 @@ export default function App() {
 
                   <div>
                     <label className="text-xs font-semibold text-slate-400 block mb-1">Setor / Departamento</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       placeholder="Ex: Financeiro, TI, Diretoria"
                       value={novoSetor}
                       onChange={(e) => setNovoSetor(e.target.value)}
@@ -1413,7 +1397,7 @@ export default function App() {
 
                   <div>
                     <label className="text-xs font-semibold text-slate-400 block mb-1">Cargo</label>
-                    <select 
+                    <select
                       value={novoCargo}
                       onChange={(e) => setNovoCargo(e.target.value)}
                       className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
@@ -1423,16 +1407,16 @@ export default function App() {
                     </select>
                   </div>
 
-                  <button 
+                  <button
                     type="submit"
                     className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow transition"
                   >
                     {editingEmail ? 'Atualizar Usuário' : 'Cadastrar'}
                   </button>
-                  
+
                   {editingEmail && (
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => {
                         setEditingEmail(null);
                         setNovoNome('');
@@ -1468,14 +1452,14 @@ export default function App() {
                         </div>
                       </div>
                       <div className="flex justify-end gap-2 pt-2 border-t border-slate-250 dark:border-slate-800/80">
-                        <button 
+                        <button
                           onClick={() => iniciarEdicao(usr)}
                           className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 rounded-lg text-[10px] font-bold transition"
                         >
                           Editar
                         </button>
                         {usr.email !== 'lucivaldo586@gmail.com' && (
-                          <button 
+                          <button
                             onClick={() => removerUsuario(usr.email)}
                             className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 text-rose-600 dark:text-rose-450 rounded-lg text-[10px] font-bold transition"
                           >
@@ -1507,19 +1491,19 @@ export default function App() {
               {alertModal.type === 'confirm' && <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400"><AlertCircle size={20} /></div>}
               <h3 className="text-sm font-extrabold">{alertModal.title}</h3>
             </div>
-            
+
             <p className="text-xs text-slate-500 dark:text-slate-300 mb-6 leading-relaxed whitespace-pre-wrap">{alertModal.message}</p>
-            
+
             <div className="flex justify-end gap-2 text-xs font-bold">
               {alertModal.type === 'confirm' ? (
                 <>
-                  <button 
+                  <button
                     onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
                     className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 transition"
                   >
                     Cancelar
                   </button>
-                  <button 
+                  <button
                     onClick={() => {
                       if (alertModal.onConfirm) alertModal.onConfirm();
                       setAlertModal(prev => ({ ...prev, show: false }));
@@ -1530,7 +1514,7 @@ export default function App() {
                   </button>
                 </>
               ) : (
-                <button 
+                <button
                   onClick={() => setAlertModal(prev => ({ ...prev, show: false }))}
                   className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow transition"
                 >
