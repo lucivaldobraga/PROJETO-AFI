@@ -692,7 +692,7 @@ export default function App() {
             />
             <div>
               <h1 className="font-bold text-base leading-none">CETAM</h1>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Orçamento</span>
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">DAF</span>
             </div>
           </div>
 
@@ -770,7 +770,7 @@ export default function App() {
         <header className="flex justify-between items-center mb-8">
           <div>
             <span className="text-xs font-bold text-slate-400 tracking-widest uppercase">DAF - DIRETORIA ADMINISTRATIVO FINANCEIRO</span>
-            <h2 className="text-3xl font-extrabold tracking-tight">Painel de Execução Orçamentárias </h2>
+            <h2 className="text-3xl font-extrabold tracking-tight">Painel de Execução Orçamentária </h2>
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto hide-in-pdf">
             {!exportandoPDF && (
