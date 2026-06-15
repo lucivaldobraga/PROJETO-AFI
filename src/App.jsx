@@ -632,7 +632,7 @@ export default function App() {
               alt="Logo CETAM"
               className="w-16 h-16 rounded-2xl object-contain shadow-xl shadow-indigo-600/10 mb-3"
             />
-            <h2 className="text-2xl font-bold tracking-tight">PAINEL DE GESTÃO ORÇAMENTÁRIA</h2>
+            <h2 className="text-lg font-extrabold tracking-wider uppercase text-center text-slate-200 mt-2">PAINEL DE GESTÃO ORÇAMENTÁRIA</h2>
           </div>
 
           {loginError && (
