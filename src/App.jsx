@@ -632,7 +632,7 @@ export default function App() {
               alt="Logo CETAM"
               className="w-16 h-16 rounded-2xl object-contain shadow-xl shadow-indigo-600/10 mb-3"
             />
-            <h2 className="text-2xl font-bold tracking-tight">Painel AFI Orçamentos</h2>
+            <h2 className="text-2xl font-bold tracking-tight">PAINEL DE GESTÃO ORÇAMENTÁRIA</h2>
           </div>
 
           {loginError && (
@@ -699,32 +699,32 @@ export default function App() {
           <nav className="space-y-1">
             <button
               onClick={() => setCurrentPage('dashboard')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'}`}
             >
               <LayoutDashboard size={18} /> Dashboard Geral
             </button>
             <button
               onClick={() => setCurrentPage('avancados')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'avancados' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'avancados' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'}`}
             >
               <TrendingUp size={18} /> Visuais Avançados
             </button>
             <button
               onClick={() => setCurrentPage('auditoria')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'auditoria' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'auditoria' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'}`}
             >
               <AlertTriangle size={18} /> Matriz de Gargalos
             </button>
             <button
               onClick={() => setCurrentPage('upload')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'upload' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'upload' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'}`}
             >
               <Upload size={18} /> Upload e Histórico
             </button>
             {user?.email === 'lucivaldo586@gmail.com' && (
               <button
                 onClick={() => setCurrentPage('usuarios')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'usuarios' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'usuarios' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'}`}
               >
                 <Users size={18} /> Gerenciar Usuários
               </button>
@@ -1452,17 +1452,17 @@ export default function App() {
                           <div>Senha: <code className="bg-slate-200/50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded font-mono font-bold text-[10px]">{usr.password || '123456'}</code></div>
                         </div>
                       </div>
-                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-250 dark:border-slate-800/80">
+                      <div className="flex justify-end gap-2 pt-2 border-t border-slate-800/60">
                         <button
                           onClick={() => iniciarEdicao(usr)}
-                          className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 rounded-lg text-[10px] font-bold transition"
+                          className="px-3 py-1.5 bg-indigo-600/15 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/20 rounded-xl text-[10px] font-bold transition duration-300"
                         >
                           Editar
                         </button>
                         {usr.email !== 'lucivaldo586@gmail.com' && (
                           <button
                             onClick={() => removerUsuario(usr.email)}
-                            className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 text-rose-600 dark:text-rose-450 rounded-lg text-[10px] font-bold transition"
+                            className="px-3 py-1.5 bg-rose-600/15 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/20 rounded-xl text-[10px] font-bold transition duration-300"
                           >
                             Remover
                           </button>
