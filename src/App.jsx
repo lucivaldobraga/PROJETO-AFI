@@ -781,7 +781,7 @@ export default function App() {
       <main className="flex-1 overflow-y-auto p-10 font-sans" id="dashboard-view">
 
         {/* Topbar Header */}
-        <header className="flex justify-between items-center mb-8">
+        <header className="flex justify-between items-center mb-8 max-w-7xl mx-auto w-full">
           <div>
             <span className="text-xs font-bold text-slate-400 tracking-widest uppercase">DAF - DIRETORIA ADMINISTRATIVO FINANCEIRO</span>
             <h2 className="text-3xl font-extrabold tracking-tight">Painel de Execução Orçamentária </h2>
@@ -805,7 +805,7 @@ export default function App() {
           <>
             {/* Dashboard Geral */}
             {currentPage === 'dashboard' && (
-              <div className="space-y-8 animate-fadeIn">
+              <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto w-full">
 
                 <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm space-y-4`}>
                   {/* Busca Geral */}
@@ -878,35 +878,35 @@ export default function App() {
 
                 {/* KPIs */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
                     <span className="text-xs font-semibold text-slate-400">Empenhado no Mês</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.empMes)}</p>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
                     <span className="text-xs font-semibold text-slate-400">Empenhado Mês (Acumulado)</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1 text-indigo-500">{formatarMoeda(totais.empAcum)}</p>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
                     <span className="text-xs font-semibold text-slate-400">Liquidado no Mês</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.liqMes)}</p>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
                     <span className="text-xs font-semibold text-slate-400">Liquidado Mês (Acumulado)</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1 text-purple-500">{formatarMoeda(totais.liqAcum)}</p>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
                     <span className="text-xs font-semibold text-slate-400">A Liquidar</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1 text-amber-500">{formatarMoeda(totais.aLiquidar)}</p>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
                     <span className="text-xs font-semibold text-slate-400">Pago no Mês</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.pagoMes)}</p>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
                     <span className="text-xs font-semibold text-slate-400">Pago Mês (Acumulado)</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1 text-emerald-500">{formatarMoeda(totais.pagoAcum)}</p>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
                     <span className="text-xs font-semibold text-slate-400">A Pagar</span>
                     <p className="text-xl font-extrabold tracking-tight mt-1 text-rose-500">{formatarMoeda(totais.aPagar)}</p>
                   </div>
@@ -1147,7 +1147,7 @@ export default function App() {
 
             {/* Visuais Avançados */}
             {currentPage === 'avancados' && (
-              <div className="space-y-8 animate-fadeIn">
+              <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto w-full">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm col-span-2`}>
                     <h3 className="text-base font-bold mb-4">Empenhos por Natureza</h3>
@@ -1289,7 +1289,7 @@ export default function App() {
               });
 
               return (
-                <div className="space-y-8 animate-fadeIn">
+                <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto w-full">
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <h3 className="text-base font-bold mb-1">Matriz de Gargalos e Auditoria</h3>
                     <p className="text-xs text-slate-500 mb-6">Detalhamento dos Credores com empenhos sob risco ou gargalo de pagamento.</p>
@@ -1374,7 +1374,7 @@ export default function App() {
 
         {/* Upload de Relatórios (Sempre Disponível) */}
         {currentPage === 'upload' && (
-          <div className="space-y-8 animate-fadeIn">
+          <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto w-full">
             <div className={`p-8 rounded-2xl border-2 border-dashed ${darkMode ? 'border-slate-800 bg-[rgba(15,23,42,0.4)]' : 'border-slate-200 bg-white'} text-center flex flex-col items-center justify-center`}>
               <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center text-indigo-600 mb-4 shadow-sm">
                 <Upload size={24} />
@@ -1420,7 +1420,7 @@ export default function App() {
 
         {/* Gerenciamento de Usuários */}
         {currentPage === 'usuarios' && user?.email === 'lucivaldo586@gmail.com' && (
-          <div className="space-y-8 animate-fadeIn">
+          <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto w-full">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
               <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
