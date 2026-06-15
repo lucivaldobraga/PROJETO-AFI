@@ -1,0 +1,16 @@
+{
+  "short_name": "AFI Orçamento",
+  "name": "Análise Orçamentária Avançada CETAM",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "display": "standalone",
+  "orientation": "portrait"
+}
