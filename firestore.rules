@@ -1,0 +1,39 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper: verifica se o usuário está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper: verifica se o usuário logado é o administrador padrão (Lucivaldo) ou possui a flag no perfil
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'lucivaldo586@gmail.com' ||
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    // Regra para coleção de orçamentos:
+    // Qualquer usuário autenticado pode ler dados. Apenas administradores podem inserir/atualizar/excluir.
+    match /orcamentos/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Regra para coleção de arquivos orçamentários:
+    match /arquivos/{document} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Regra para gerenciamento de perfis de usuários:
+    // Apenas o Administrador Lucivaldo pode criar e editar perfis. Qualquer logado pode ler seu próprio perfil.
+    match /usuarios/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+  }
+}

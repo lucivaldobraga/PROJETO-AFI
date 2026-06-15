@@ -1,0 +1,29 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b2b/{bucket}/o {
+    
+    // Helper: verifica se o usuário está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper: verifica se o usuário logado é admin
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'lucivaldo586@gmail.com'
+      );
+    }
+
+    // Apenas admins cadastrados podem fazer upload de relatórios brutos (.xls, .xlsx)
+    match /bruto/{allPaths=**} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Qualquer usuário autenticado pode ler os relatórios tratados (para download)
+    match /tratado/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}
