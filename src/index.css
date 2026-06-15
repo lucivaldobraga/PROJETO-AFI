@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Ajustes Finos de Paleta de Cores e Tipografia (Premium) */
+/* Ajustes Finos de Paleta de Cores e Tipografia (Premium - M3 Style) */
 
 @layer base {
   body {
@@ -8,10 +8,10 @@
   }
 }
 
-/* Custom Scrollbar Premium */
+/* Custom Scrollbar Premium - M3 Discreto */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -19,29 +19,80 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: rgba(100, 116, 139, 0.2);
   border-radius: 9999px;
 }
 
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.4);
+}
+
 .dark ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.3);
 }
 
 /* Classes Customizadas Hexadecimal para evitar erros de OKLCH no html2canvas */
-.custom-bg-light { background-color: #f8fafc !important; color: #0f172a !important; }
-.custom-bg-dark { background-color: #020617 !important; color: #f8fafc !important; }
+.custom-bg-light { 
+  background-color: #f3f4f6 !important; 
+  color: #1f2937 !important; 
+}
+.custom-bg-dark { 
+  background-color: #070a13 !important; 
+  color: #f3f4f6 !important; 
+}
 
-.custom-card-light { background-color: #ffffff !important; border-color: #e2e8f0 !important; color: #0f172a !important; }
-.custom-card-dark { background-color: #0f172a !important; border-color: #1e293b !important; color: #f8fafc !important; }
+/* M3 Card Container - Extra Rounded (24px) */
+.custom-card-light { 
+  background-color: #ffffff !important; 
+  border-color: rgba(229, 231, 235, 0.8) !important; 
+  color: #1f2937 !important; 
+  border-radius: 24px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+.custom-card-dark { 
+  background-color: #0d1220 !important; 
+  border-color: rgba(30, 41, 59, 0.8) !important; 
+  color: #f3f4f6 !important; 
+  border-radius: 24px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+}
 
-.custom-sidebar-light { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
-.custom-sidebar-dark { background-color: #090d16 !important; border-color: #1e293b !important; }
+/* Sidebar Custom - Rounded Right (32px) */
+.custom-sidebar-light { 
+  background-color: #ffffff !important; 
+  border-color: rgba(229, 231, 235, 0.8) !important; 
+  border-top-right-radius: 32px !important;
+  border-bottom-right-radius: 32px !important;
+}
+.custom-sidebar-dark { 
+  background-color: #090d16 !important; 
+  border-color: rgba(30, 41, 59, 0.8) !important; 
+  border-top-right-radius: 32px !important;
+  border-bottom-right-radius: 32px !important;
+}
 
-.custom-text-light { color: #334155 !important; }
-.custom-text-dark { color: #cbd5e1 !important; }
+.custom-text-light { color: #4b5563 !important; }
+.custom-text-dark { color: #9ca3af !important; }
 
-.custom-border-light { border-color: #e2e8f0 !important; }
+.custom-border-light { border-color: #e5e7eb !important; }
 .custom-border-dark { border-color: #1e293b !important; }
+
+/* Material Design 3 Navigation Pill Active State */
+.m3-nav-item-active {
+  background-color: rgba(99, 102, 241, 0.12) !important;
+  color: #4f46e5 !important;
+  font-weight: 700 !important;
+}
+
+.dark .m3-nav-item-active {
+  background-color: rgba(99, 102, 241, 0.25) !important;
+  color: #a5b4fc !important;
+  font-weight: 700 !important;
+}
 
 /* Ocultar elementos específicos na exportação do PDF */
 .exporting-pdf .hide-in-pdf {
@@ -61,4 +112,3 @@
 .animate-fadeIn {
   animation: fadeIn 0.4s ease-out forwards;
 }
-

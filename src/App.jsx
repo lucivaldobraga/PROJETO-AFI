@@ -82,7 +82,7 @@ function SearchableDropdown({ label, value, onChange, options, placeholder, dark
           onChange={handleInputChange}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder || "Pesquisar..."}
-          className={`w-full pl-3 pr-8 py-2 rounded-xl border outline-none text-xs transition ${darkMode
+          className={`w-full pl-4 pr-8 py-2.5 rounded-full border outline-none text-xs transition ${darkMode
             ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500 placeholder-slate-600'
             : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-indigo-500 placeholder-slate-400'
             }`}
@@ -106,7 +106,7 @@ function SearchableDropdown({ label, value, onChange, options, placeholder, dark
       </div>
 
       {isOpen && (
-        <ul className={`absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-xl border shadow-lg text-xs ${darkMode
+        <ul className={`absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-2xl border shadow-lg text-xs ${darkMode
           ? 'bg-slate-950 border-slate-800 text-white divide-y divide-slate-850'
           : 'bg-white border-slate-200 text-slate-800 divide-y divide-slate-105'
           }`}>
@@ -503,46 +503,258 @@ export default function App() {
     return `R$ ${valor}`;
   };
 
-  const exportarPDF = () => {
-    const input = document.getElementById('dashboard-view');
-    document.body.classList.add('exporting-pdf');
+  const exportarPDF = async () => {
     setExportandoPDF(true);
+    
+    // Alerta customizado de início
+    const loadingAlert = document.createElement('div');
+    loadingAlert.style.position = 'fixed';
+    loadingAlert.style.top = '20px';
+    loadingAlert.style.right = '20px';
+    loadingAlert.style.zIndex = '9999';
+    loadingAlert.style.backgroundColor = '#4f46e5';
+    loadingAlert.style.color = '#ffffff';
+    loadingAlert.style.padding = '12px 24px';
+    loadingAlert.style.borderRadius = '12px';
+    loadingAlert.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+    loadingAlert.style.fontFamily = 'Outfit, sans-serif';
+    loadingAlert.style.fontSize = '12px';
+    loadingAlert.style.fontWeight = 'bold';
+    loadingAlert.innerText = 'Gerando relatório PDF estruturado...';
+    document.body.appendChild(loadingAlert);
 
-    // Pequeno atraso para a interface ocultar os botões/filtros
-    setTimeout(() => {
-      html2canvas(input, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: darkMode ? '#020617' : '#f8fafc'
-      }).then((canvas) => {
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const imgWidth = 210;
-        const pageHeight = 297;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        let heightLeft = imgHeight;
-        let position = 0;
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const drawHeader = (titulo, pageNum, totalPages) => {
+        // Cor de fundo geral do relatório baseada no tema
+        pdf.setFillColor(255, 255, 255); // Usar branco no PDF para impressão profissional
+        pdf.rect(0, 0, 210, 297, 'F');
+        
+        // Cabeçalho institucional (faixa superior)
+        pdf.setFillColor(79, 70, 229); // indigo-600
+        pdf.rect(0, 0, 210, 22, 'F');
+        
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(11);
+        pdf.setTextColor(255, 255, 255);
+        pdf.text("CETAM - CENTRO DE EDUCAÇÃO TECNOLÓGICA DO AMAZONAS", 12, 10);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(8);
+        pdf.text("DAF - DIRETORIA ADMINISTRATIVO FINANCEIRA", 12, 15);
+        
+        // Linha divisória
+        pdf.setDrawColor(229, 231, 235);
+        pdf.setLineWidth(0.5);
+        pdf.line(10, 36, 200, 36);
+        
+        // Título da Página
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(13);
+        pdf.setTextColor(15, 23, 42); // slate-900
+        pdf.text(titulo, 12, 30);
+        
+        // Rodapé
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(8);
+        pdf.setTextColor(156, 163, 175);
+        pdf.text(`Emitido em: ${new Date().toLocaleString()} • Por: ${user?.name || 'Administrador'}`, 12, 288);
+        pdf.text(`Página ${pageNum} de ${totalPages}`, 180, 288);
+      };
 
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      const getChartImage = async (id) => {
+        const el = document.getElementById(id);
+        if (!el) return null;
+        const canvas = await html2canvas(el, {
+          scale: 2.2,
+          useCORS: true,
+          backgroundColor: '#ffffff' // Fundo branco no PDF para melhor impressão
+        });
+        return canvas.toDataURL('image/png');
+      };
 
-        while (heightLeft >= 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-          heightLeft -= pageHeight;
+      if (currentPage === 'dashboard') {
+        const totalPaginas = 3;
+        
+        // PAGINA 1: Resumo Executivo e KPIs
+        drawHeader("RELATÓRIO DE EXECUÇÃO ORÇAMENTÁRIA - RESUMO", 1, totalPaginas);
+        
+        // Escrever Metadados dos Filtros
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(9);
+        pdf.setTextColor(71, 85, 105);
+        pdf.text("Filtros Ativos:", 12, 43);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(`Exercício: ${filtroAno}  |  Credor: ${filtroCredor}  |  NE: ${filtroNE}  |  Processo: ${filtroProcesso}  |  UO: ${filtroUO}`, 12, 48);
+
+        // Desenhar Tabela de KPIs (Vetorizada)
+        let startY = 56;
+        pdf.setFillColor(79, 70, 229); // cabeçalho da tabela
+        pdf.rect(12, startY, 186, 7, 'F');
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(8);
+        pdf.setTextColor(255, 255, 255);
+        pdf.text("CATEGORIA", 15, startY + 5);
+        pdf.text("VALOR NO MÊS", 85, startY + 5);
+        pdf.text("ACUMULADO / SALDO", 145, startY + 5);
+
+        const kpisData = [
+          { name: "Despesa Empenhada", mes: totais.empMes, acum: totais.empAcum, color: [79, 70, 229] },
+          { name: "Despesa Liquidada", mes: totais.liqMes, acum: totais.liqAcum, color: [139, 92, 246] },
+          { name: "Despesa Paga", mes: totais.pagoMes, acum: totais.pagoAcum, color: [16, 185, 129] },
+          { name: "A Liquidar (Saldo)", mes: 0, acum: totais.aLiquidar, color: [245, 158, 11] },
+          { name: "A Pagar (Saldo)", mes: 0, acum: totais.aPagar, color: [239, 68, 68] }
+        ];
+
+        let currY = startY + 7;
+        kpisData.forEach((row, idx) => {
+          pdf.setFillColor(idx % 2 === 0 ? 249 : 243, idx % 2 === 0 ? 250 : 244, idx % 2 === 0 ? 251 : 246);
+          pdf.rect(12, currY, 186, 8, 'F');
+          
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(8);
+          pdf.setTextColor(31, 41, 55);
+          pdf.text(row.name, 15, currY + 5.5);
+          
+          pdf.setFont("helvetica", "normal");
+          pdf.text(row.mes > 0 ? formatarMoeda(row.mes) : "-", 85, currY + 5.5);
+          
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(row.color[0], row.color[1], row.color[2]);
+          pdf.text(formatarMoeda(row.acum), 145, currY + 5.5);
+          
+          currY += 8;
+        });
+
+        // Adicionar Resumo das Operações do Dia
+        currY += 8;
+        pdf.setFillColor(239, 246, 255); // azul sutil
+        pdf.rect(12, currY, 186, 20, 'F');
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(37, 99, 235);
+        pdf.text(`MOVIMENTAÇÕES PROGRAMADAS PARA HOJE (${dataHojeRef})`, 15, currY + 5);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(51, 65, 85);
+        pdf.text(`Total Pago Hoje: ${formatarMoeda(valorHoje)}   |   Total Empenhado: ${formatarMoeda(empenhadoHojeTotal)}`, 15, currY + 11);
+        pdf.text(`Saldo A Liquidar: ${formatarMoeda(aLiquidarHojeTotal)}   |   Saldo A Pagar: ${formatarMoeda(aPagarHojeTotal)}`, 15, currY + 16);
+
+        // Inserir Gráfico de Hoje se houver registros
+        const imgHoje = await getChartImage('grafico-hoje');
+        if (imgHoje) {
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(9);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text("Detalhamento Gráfico das Movimentações do Dia", 12, currY + 28);
+          pdf.addImage(imgHoje, 'PNG', 12, currY + 31, 186, 95);
         }
 
-        pdf.save(`relatorio_orcamentario_${currentPage}.pdf`);
-        document.body.classList.remove('exporting-pdf');
-        setExportandoPDF(false);
-      }).catch(err => {
-        console.error("Erro ao gerar PDF:", err);
-        document.body.classList.remove('exporting-pdf');
-        setExportandoPDF(false);
-        customAlert("Erro de Exportação", "Não foi possível gerar o PDF. Verifique o console.", "error");
-      });
-    }, 150);
+        // PAGINA 2: Evolução e Exercícios
+        pdf.addPage();
+        drawHeader("ANÁLISE DE EVOLUÇÃO E ORÇAMENTO POR EXERCÍCIO", 2, totalPaginas);
+
+        const imgEvolucao = await getChartImage('grafico-evolucao');
+        if (imgEvolucao) {
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(9);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text("Evolução Mensal (Empenhado vs Pago)", 12, 42);
+          pdf.addImage(imgEvolucao, 'PNG', 12, 45, 186, 95);
+        }
+
+        const imgExercicios = await getChartImage('grafico-exercicio');
+        if (imgExercicios) {
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(9);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text("Total Pago vs Empenhado por Exercício", 12, 155);
+          pdf.addImage(imgExercicios, 'PNG', 12, 158, 186, 95);
+        }
+
+        // PAGINA 3: Maiores Credores e Maiores UOs
+        pdf.addPage();
+        drawHeader("MAIORES CONTRATADOS E UNIDADES ORÇAMENTÁRIAS", 3, totalPaginas);
+
+        const imgCredores = await getChartImage('grafico-credores');
+        if (imgCredores) {
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(9);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text("Maiores Contratados por Volume de Empenhos", 12, 42);
+          pdf.addImage(imgCredores, 'PNG', 12, 45, 186, 105);
+        }
+
+        const imgUos = await getChartImage('grafico-uos');
+        if (imgUos) {
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(9);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text("Maiores Despesas por Unidade Orçamentária (UO)", 12, 160);
+          pdf.addImage(imgUos, 'PNG', 12, 163, 186, 105);
+        }
+
+      } else if (currentPage === 'avancados') {
+        const totalPaginas = 1;
+        drawHeader("ANÁLISE AVANÇADA, EXECUÇÃO E NATUREZAS", 1, totalPaginas);
+
+        // Execução Geral e Funil Lado a Lado
+        const imgGauge = await getChartImage('grafico-gauge');
+        if (imgGauge) {
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(9);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text("Percentual de Execução Geral", 12, 43);
+          pdf.addImage(imgGauge, 'PNG', 12, 46, 88, 55);
+        }
+
+        const imgFunil = await getChartImage('grafico-funil');
+        if (imgFunil) {
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(9);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text("Funil Orçamentário", 110, 43);
+          pdf.addImage(imgFunil, 'PNG', 110, 46, 88, 55);
+        }
+
+        // Gráfico de Naturezas de Despesa
+        const imgNatureza = await getChartImage('grafico-natureza');
+        if (imgNatureza) {
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(9);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text("Empenhos por Natureza de Despesa", 12, 125);
+          pdf.addImage(imgNatureza, 'PNG', 12, 128, 186, 110);
+        }
+      } else {
+        // Print simples formatado
+        drawHeader(`RELATÓRIO - ${currentPage.toUpperCase()}`, 1, 1);
+        const input = document.getElementById('dashboard-view');
+        const canvas = await html2canvas(input, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff'
+        });
+        const imgData = canvas.toDataURL('image/png');
+        pdf.addImage(imgData, 'PNG', 12, 42, 186, (canvas.height * 186) / canvas.width);
+      }
+
+      pdf.save(`relatorio_${currentPage}_${filtroAno}.pdf`);
+      
+      // Remover alerta
+      if (loadingAlert.parentNode) {
+        loadingAlert.parentNode.removeChild(loadingAlert);
+      }
+      customAlert("Sucesso", "O relatório PDF foi gerado e baixado com sucesso!", "success");
+    } catch (err) {
+      console.error("Erro na exportação para PDF:", err);
+      if (loadingAlert.parentNode) {
+        loadingAlert.parentNode.removeChild(loadingAlert);
+      }
+      customAlert("Erro", "Não foi possível gerar o PDF. Verifique o console.", "error");
+    } finally {
+      setExportandoPDF(false);
+    }
   };
 
   const exportarXLS = () => {
@@ -696,83 +908,80 @@ export default function App() {
     <div className={`min-h-screen flex transition-colors duration-300 ${darkMode ? 'custom-bg-dark text-slate-100' : 'custom-bg-light text-slate-800'}`}>
 
       {/* Sidebar Fixo Lateral */}
-      <aside className={`w-72 flex-shrink-0 border-r ${darkMode ? 'custom-sidebar-dark text-slate-200' : 'custom-sidebar-light text-slate-800'} p-6 flex flex-col justify-between`}>
+      <aside className={`w-72 flex-shrink-0 border-r ${darkMode ? 'custom-sidebar-dark text-slate-200' : 'custom-sidebar-light text-slate-800'} p-6 flex flex-col`}>
         <div>
-          <div className="flex items-center gap-3 mb-10">
+          {/* Logo e Nome Centralizados */}
+          <div className="flex flex-col items-center text-center gap-2 mb-8">
             <img
               src={logoImg}
               alt="Logo CETAM"
-              className="w-10 h-10 rounded-xl object-contain shadow-md"
+              className="w-16 h-16 rounded-2xl object-contain shadow-lg"
             />
             <div>
-              <h1 className="font-bold text-base leading-none">CETAM</h1>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">DAF</span>
+              <h1 className="font-extrabold text-lg leading-tight tracking-wide">CETAM</h1>
+              <span className="text-[10px] uppercase font-extrabold tracking-widest text-slate-400 dark:text-slate-500 block mt-0.5">DAF</span>
             </div>
           </div>
 
           <nav className="space-y-1">
             <button
               onClick={() => setCurrentPage('dashboard')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all text-sm font-semibold ${currentPage === 'dashboard' ? 'm3-nav-item-active' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-850 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-slate-200'}`}
             >
               <LayoutDashboard size={18} /> Dashboard Geral
             </button>
             <button
               onClick={() => setCurrentPage('avancados')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'avancados' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all text-sm font-semibold ${currentPage === 'avancados' ? 'm3-nav-item-active' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-850 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-slate-200'}`}
             >
               <TrendingUp size={18} /> Visuais Avançados
             </button>
             <button
               onClick={() => setCurrentPage('auditoria')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'auditoria' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all text-sm font-semibold ${currentPage === 'auditoria' ? 'm3-nav-item-active' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-850 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-slate-200'}`}
             >
               <AlertTriangle size={18} /> Matriz de Gargalos
             </button>
             <button
               onClick={() => setCurrentPage('upload')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'upload' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all text-sm font-semibold ${currentPage === 'upload' ? 'm3-nav-item-active' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-850 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-slate-200'}`}
             >
               <Upload size={18} /> Upload e Histórico
             </button>
             {user?.email === 'lucivaldo586@gmail.com' && (
               <button
                 onClick={() => setCurrentPage('usuarios')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'usuarios' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'}`}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all text-sm font-semibold ${currentPage === 'usuarios' ? 'm3-nav-item-active' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-850 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-slate-200'}`}
               >
                 <Users size={18} /> Gerenciar Usuários
               </button>
             )}
           </nav>
-        </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-[10px] text-slate-400 px-2">
-            <span>Sincronismo</span>
-            <button onClick={carregarDadosFirebase} className="hover:text-indigo-500 transition">
-              <RefreshCw size={12} className={loadingFirebase ? 'animate-spin' : ''} />
-            </button>
-          </div>
-
-
-
-          <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white uppercase">
-                {user?.name.substring(0, 2)}
-              </div>
-              <div className="overflow-hidden">
-                <p className="text-xs font-bold truncate">{user?.name}</p>
-                <span className="text-[10px] text-slate-400 truncate block">Administrador</span>
-              </div>
+          {/* Sincronismo e Usuário integrado abaixo do menu */}
+          <div className="mt-6 pt-5 border-t border-slate-200 dark:border-slate-800 space-y-4">
+            {/* Sincronismo */}
+            <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 px-3">
+              <span className="uppercase tracking-wider">Sincronismo</span>
+              <button onClick={carregarDadosFirebase} className="hover:text-indigo-500 dark:hover:text-indigo-400 transition" title="Carregar Dados">
+                <RefreshCw size={12} className={loadingFirebase ? 'animate-spin' : ''} />
+              </button>
             </div>
 
-            <button
-              onClick={handleLogout}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition"
-            >
-              <LogOut size={16} />
-            </button>
+            {/* Informações do Usuário (Sem foto de perfil) */}
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/50">
+              <div className="overflow-hidden">
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{user?.name}</p>
+                <span className="text-[9px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 block mt-0.5">Administrador</span>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition flex-shrink-0"
+                title="Sair"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -956,7 +1165,7 @@ export default function App() {
                   {/* Gráfico: Empenhos para a Data de Hoje */}
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm lg:col-span-2`}>
                     <h3 className="text-base font-extrabold tracking-tight mb-4">Empenhos para a Data de Hoje</h3>
-                    <div className="h-64 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-800" style={{ minHeight: '250px', minWidth: '0' }}>
+                    <div className="h-64 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-800" style={{ minHeight: '250px', minWidth: '0' }} id="grafico-hoje">
                       {empenhosHoje.length > 0 ? (
                         <div style={{ height: `${Math.max(250, chartDadosHoje.length * 45)}px` }}>
                           <ResponsiveContainer width="100%" height="100%">
@@ -1031,7 +1240,7 @@ export default function App() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <h3 className="text-base font-bold mb-4">Evolução Mensal (Empenhado vs Pago)</h3>
-                    <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }}>
+                    <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }} id="grafico-evolucao">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={dataEvolucaoMensal}>
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
@@ -1058,7 +1267,7 @@ export default function App() {
 
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <h3 className="text-base font-bold mb-4">Total Pago vs Empenhado por Exercício</h3>
-                    <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }}>
+                    <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }} id="grafico-exercicio">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={totalPorAno}>
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
@@ -1087,7 +1296,7 @@ export default function App() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <h3 className="text-base font-bold mb-4">Maiores Orçamentos por Credor</h3>
-                    <div className="h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-800" style={{ minHeight: '320px', minWidth: '0' }}>
+                    <div className="h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-800" style={{ minHeight: '320px', minWidth: '0' }} id="grafico-credores">
                       <div style={{ height: `${Math.max(320, maioresCredores.length * 45)}px` }}>
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={maioresCredores} layout="vertical">
@@ -1114,7 +1323,7 @@ export default function App() {
 
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                     <h3 className="text-base font-bold mb-4">Maiores Gastos por Unidade Orçamentária (UO)</h3>
-                    <div className="h-80 overflow-x-auto overflow-y-hidden pr-2 scrollbar-thin scrollbar-thumb-slate-800" style={{ minHeight: '320px', minWidth: '0' }}>
+                    <div className="h-80 overflow-x-auto overflow-y-hidden pr-2 scrollbar-thin scrollbar-thumb-slate-800" style={{ minHeight: '320px', minWidth: '0' }} id="grafico-uos">
                       <div style={{ width: `${Math.max(450, despesasPorUO.length * 85)}px`, height: '100%' }}>
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={despesasPorUO}>
@@ -1152,7 +1361,7 @@ export default function App() {
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm col-span-2`}>
                     <h3 className="text-base font-bold mb-4">Empenhos por Natureza</h3>
                     <div className="h-80 flex flex-col md:flex-row items-center justify-around">
-                      <div className="h-64 w-full md:w-3/5">
+                      <div className="h-64 w-full md:w-3/5" id="grafico-natureza">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie 
@@ -1213,7 +1422,7 @@ export default function App() {
 
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center`}>
                     <h3 className="text-base font-bold mb-2">Execução Geral</h3>
-                    <div className="relative w-[320px] h-[160px] overflow-hidden mb-2 flex items-center justify-center">
+                    <div className="relative w-[320px] h-[160px] overflow-hidden mb-2 flex items-center justify-center" id="grafico-gauge">
                       <PieChart width={320} height={320} style={{ position: 'absolute', top: 0 }}>
                         <Pie
                           data={[
@@ -1244,7 +1453,7 @@ export default function App() {
 
                 <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
                   <h3 className="text-base font-bold mb-4">Funil Orçamentário</h3>
-                  <div className="h-80">
+                  <div className="h-80" id="grafico-funil">
                     <ResponsiveContainer width="100%" height="100%">
                       <FunnelChart>
                         <Tooltip formatter={(value) => [formatarMoeda(value), '']} />
