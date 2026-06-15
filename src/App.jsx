@@ -1086,38 +1086,53 @@ export default function App() {
                 </div>
 
                 {/* KPIs */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
-                    <span className="text-xs font-semibold text-slate-400">Empenhado no Mês</span>
-                    <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.empMes)}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {/* Coluna 1: Empenhos */}
+                  <div className="flex flex-col gap-4">
+                    <div className={`p-5 border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center flex-1`}>
+                      <span className="text-xs font-semibold text-slate-400">Empenhado no Mês</span>
+                      <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.empMes)}</p>
+                    </div>
+                    <div className={`p-5 border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center flex-1`}>
+                      <span className="text-xs font-semibold text-slate-400">Empenhado Mês (Acumulado)</span>
+                      <p className="text-xl font-extrabold tracking-tight mt-1 text-indigo-500">{formatarMoeda(totais.empAcum)}</p>
+                    </div>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
-                    <span className="text-xs font-semibold text-slate-400">Empenhado Mês (Acumulado)</span>
-                    <p className="text-xl font-extrabold tracking-tight mt-1 text-indigo-500">{formatarMoeda(totais.empAcum)}</p>
+
+                  {/* Coluna 2: Pagos */}
+                  <div className="flex flex-col gap-4">
+                    <div className={`p-5 border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center flex-1`}>
+                      <span className="text-xs font-semibold text-slate-400">Pago no Mês</span>
+                      <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.pagoMes)}</p>
+                    </div>
+                    <div className={`p-5 border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center flex-1`}>
+                      <span className="text-xs font-semibold text-slate-400">Pago Mês (Acumulado)</span>
+                      <p className="text-xl font-extrabold tracking-tight mt-1 text-emerald-500">{formatarMoeda(totais.pagoAcum)}</p>
+                    </div>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
-                    <span className="text-xs font-semibold text-slate-400">Liquidado no Mês</span>
-                    <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.liqMes)}</p>
+
+                  {/* Coluna 3: Liquidados */}
+                  <div className="flex flex-col gap-4">
+                    <div className={`p-5 border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center flex-1`}>
+                      <span className="text-xs font-semibold text-slate-400">Liquidado no Mês</span>
+                      <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.liqMes)}</p>
+                    </div>
+                    <div className={`p-5 border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center flex-1`}>
+                      <span className="text-xs font-semibold text-slate-400">Liquidado Mês (Acumulado)</span>
+                      <p className="text-xl font-extrabold tracking-tight mt-1 text-purple-500">{formatarMoeda(totais.liqAcum)}</p>
+                    </div>
                   </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
-                    <span className="text-xs font-semibold text-slate-400">Liquidado Mês (Acumulado)</span>
-                    <p className="text-xl font-extrabold tracking-tight mt-1 text-purple-500">{formatarMoeda(totais.liqAcum)}</p>
-                  </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
-                    <span className="text-xs font-semibold text-slate-400">A Liquidar</span>
-                    <p className="text-xl font-extrabold tracking-tight mt-1 text-amber-500">{formatarMoeda(totais.aLiquidar)}</p>
-                  </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
-                    <span className="text-xs font-semibold text-slate-400">Pago no Mês</span>
-                    <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.pagoMes)}</p>
-                  </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
-                    <span className="text-xs font-semibold text-slate-400">Pago Mês (Acumulado)</span>
-                    <p className="text-xl font-extrabold tracking-tight mt-1 text-emerald-500">{formatarMoeda(totais.pagoAcum)}</p>
-                  </div>
-                  <div className={`p-5 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center`}>
-                    <span className="text-xs font-semibold text-slate-400">A Pagar</span>
-                    <p className="text-xl font-extrabold tracking-tight mt-1 text-rose-500">{formatarMoeda(totais.aPagar)}</p>
+
+                  {/* Coluna 4: Saldos */}
+                  <div className="flex flex-col gap-4">
+                    <div className={`p-5 border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center flex-1`}>
+                      <span className="text-xs font-semibold text-slate-400">A Liquidar</span>
+                      <p className="text-xl font-extrabold tracking-tight mt-1 text-amber-500">{formatarMoeda(totais.aLiquidar)}</p>
+                    </div>
+                    <div className={`p-5 border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center text-center flex-1`}>
+                      <span className="text-xs font-semibold text-slate-400">A Pagar</span>
+                      <p className="text-xl font-extrabold tracking-tight mt-1 text-rose-500">{formatarMoeda(totais.aPagar)}</p>
+                    </div>
                   </div>
                 </div>
 
