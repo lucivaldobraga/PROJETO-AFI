@@ -81,7 +81,6 @@ export const firebaseService = {
     await uploadBytes(storageRef, file);
     const downloadURL = await getDownloadURL(storageRef);
 
-    // Salva registro inicial do arquivo no Firestore
     const docRef = await addDoc(collection(db, 'arquivos'), {
       nome_original: file.name,
       caminho_bruto: `bruto/${file.name}`,
@@ -90,6 +89,31 @@ export const firebaseService = {
     });
 
     return { docId: docRef.id, downloadURL };
+  },
+
+  // Firestore: Deletar arquivo e registros vinculados a ele
+  removerArquivo: async (nomeOriginal) => {
+    try {
+      // 1. Remover documento em 'arquivos'
+      const qArq = query(collection(db, 'arquivos'), where('nome_original', '==', nomeOriginal));
+      const snapArq = await getDocs(qArq);
+      snapArq.forEach(async (docSnap) => {
+        const { deleteDoc, doc } = await import('firebase/firestore');
+        await deleteDoc(doc(db, 'arquivos', docSnap.id));
+      });
+
+      // 2. Remover orçamentos associados a este arquivo
+      const qOrc = query(collection(db, 'orcamentos'), where('arquivo_origem', '==', nomeOriginal));
+      const snapOrc = await getDocs(qOrc);
+      snapOrc.forEach(async (docSnap) => {
+        const { deleteDoc, doc } = await import('firebase/firestore');
+        await deleteDoc(doc(db, 'orcamentos', docSnap.id));
+      });
+      return true;
+    } catch (error) {
+      console.error("Erro ao deletar arquivo no Firebase:", error);
+      return false;
+    }
   }
 };
 

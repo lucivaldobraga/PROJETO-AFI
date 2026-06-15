@@ -1,1 +1,28 @@
 @import "tailwindcss";
+
+/* Ajustes Finos de Paleta de Cores e Tipografia (Premium) */
+
+@layer base {
+  body {
+    @apply transition-colors duration-300 font-sans antialiased;
+  }
+}
+
+/* Custom Scrollbar Premium */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}

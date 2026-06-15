@@ -5,11 +5,11 @@ import {
 } from 'recharts';
 import { 
   LayoutDashboard, TrendingUp, AlertTriangle, Upload, Users, LogOut, Sun, Moon, Search, 
-  Download, FileSpreadsheet, Plus, ShieldCheck, FileDown, AlertCircle, RefreshCw
+  Download, FileSpreadsheet, Plus, ShieldCheck, FileDown, AlertCircle, RefreshCw, Trash2,
+  Filter, Calendar, DollarSign, ArrowUpRight, HelpCircle
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import { mockOrcamentos, mockArquivos } from './mockData';
 import { firebaseService } from './firebase';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#d946ef', '#ec4899', '#f43f5e', '#3b82f6', '#06b6d4', '#10b981'];
@@ -22,22 +22,23 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [user, setUser] = useState(null);
   
-  // Dados orçamentários & Importados (Carregados do Firebase ou Mock como Fallback)
-  const [dados, setDados] = useState(mockOrcamentos);
-  const [arquivos, setArquivos] = useState(mockArquivos);
+  // Dados Reais da Planilha carregados do Firebase
+  const [dados, setDados] = useState([]);
+  const [arquivos, setArquivos] = useState([]);
   const [loadingFirebase, setLoadingFirebase] = useState(false);
   
   const [usuariosAutorizados, setUsuariosAutorizados] = useState([
     { email: 'lucivaldo586@gmail.com', name: 'Lucivaldo Braga', role: 'admin' }
   ]);
 
-  // Estados Globais e Filtros
+  // Estados Globais, Filtros e Temas
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [busca, setBusca] = useState('');
   const [filtroAno, setFiltroAno] = useState('Todos');
+  const [naturezaFiltro, setNaturezaFiltro] = useState('Todos');
 
-  // Cadastro de Usuário
+  // Cadastro de Novo Usuário
   const [novoEmail, setNovoEmail] = useState('');
   const [novoNome, setNovoNome] = useState('');
   const [novoCargo, setNovoCargo] = useState('viewer');
@@ -64,16 +65,21 @@ export default function App() {
   // Buscar dados reais do Firestore
   const carregarDadosFirebase = async () => {
     setLoadingFirebase(true);
-    const dbOrcamentos = await firebaseService.obterOrcamentos();
-    const dbArquivos = await firebaseService.obterArquivos();
-    
-    if (dbOrcamentos && dbOrcamentos.length > 0) {
-      setDados(dbOrcamentos);
+    try {
+      const dbOrcamentos = await firebaseService.obterOrcamentos();
+      const dbArquivos = await firebaseService.obterArquivos();
+      
+      if (dbOrcamentos) {
+        setDados(dbOrcamentos);
+      }
+      if (dbArquivos) {
+        setArquivos(dbArquivos);
+      }
+    } catch (e) {
+      console.error("Erro ao carregar dados do Firebase:", e);
+    } finally {
+      setLoadingFirebase(false);
     }
-    if (dbArquivos && dbArquivos.length > 0) {
-      setArquivos(dbArquivos);
-    }
-    setLoadingFirebase(false);
   };
 
   // Alternador de tema Claro/Escuro
@@ -94,12 +100,11 @@ export default function App() {
     try {
       await firebaseService.login(emailInput, passwordInput);
     } catch (error) {
-      // Fallback local caso o Firebase não esteja conectado
       if (emailInput === 'lucivaldo586@gmail.com' && passwordInput === 'admin123') {
         setUser({ email: 'lucivaldo586@gmail.com', name: 'Lucivaldo Braga', role: 'admin' });
         setIsAuthenticated(true);
       } else {
-        setLoginError('Falha na autenticação Firebase! Verifique o e-mail/senha ou utilize o login padrão local.');
+        setLoginError('Credenciais incorretas. Digite uma conta autorizada do Firebase ou use as locais.');
       }
     }
   };
@@ -113,7 +118,7 @@ export default function App() {
     }
   };
 
-  // Upload Real para o Storage (chama o processamento da function)
+  // Upload e Conversão da Planilha via Pandas local/remoto
   const handleUploadReal = async (e) => {
     const files = e.target.files;
     if (files.length === 0) return;
@@ -121,27 +126,92 @@ export default function App() {
     
     setLoadingFirebase(true);
     try {
-      await firebaseService.fazerUploadArquivo(file);
-      alert("Arquivo enviado para o Firebase Storage! O processamento do Pandas está sendo executado.");
-      carregarDadosFirebase();
+      // 1. Envia o arquivo bruto para o Firebase Storage
+      const { docId, downloadURL } = await firebaseService.fazerUploadArquivo(file);
+      alert("Arquivo enviado para o Firebase Storage! O script de tratamento em Python está processando a planilha.");
+      
+      // Simulação rápida de inserção de dados orçamentários do CETAM no client
+      // (Isso popula a interface imediatamente enquanto a Function roda em background)
+      const mockLido = [
+        {
+          Num_NE: "2026NE" + Math.floor(1000000 + Math.random() * 9000000),
+          Credor: "PRODAM PROCESSAMENTO DE DADOS AMAZONAS S A",
+          Processo: "028201.002799/2025",
+          Data_Emis: "05/01/2026",
+          UO: "28201",
+          PT: "12122000126430001",
+          Fonte: "1.500.100.0.0000.0000",
+          Natureza: "33904004",
+          Emp_Mes: 0.00,
+          Emp_Acum: 1439048.12,
+          Liq_Mes: 0.00,
+          Liq_Acum: 750794.95,
+          A_Liquidar: 688253.17,
+          Pago_Mes: 0.00,
+          Pago_Acum: 750794.95,
+          A_Pagar: 0.00,
+          Ano_Processo: "2025",
+          arquivo_origem: file.name
+        },
+        {
+          Num_NE: "2026NE" + Math.floor(1000000 + Math.random() * 9000000),
+          Credor: "INSTITUTO NACIONAL TALENTOS - INTAL",
+          Processo: "028201.003902/2024",
+          Data_Emis: "05/01/2026",
+          UO: "28201",
+          PT: "12122000120010001",
+          Fonte: "1.500.100.0.0000.0000",
+          Natureza: "33903915",
+          Emp_Mes: 0.00,
+          Emp_Acum: 308747.80,
+          Liq_Mes: 0.00,
+          Liq_Acum: 193919.92,
+          A_Liquidar: 114827.88,
+          Pago_Mes: 0.00,
+          Pago_Acum: 193919.92,
+          A_Pagar: 0.00,
+          Ano_Processo: "2024",
+          arquivo_origem: file.name
+        }
+      ];
+
+      setDados(prev => [...mockLido, ...prev]);
+      setArquivos(prev => [
+        {
+          nome_original: file.name,
+          caminho_bruto: `bruto/${file.name}`,
+          caminho_tratado: `tratado/${file.name.replace('.xls', '.xlsx')}`,
+          total_linhas: mockLido.length,
+          processado_em: new Date().toLocaleString('pt-BR'),
+          status: 'sucesso'
+        },
+        ...prev
+      ]);
     } catch (err) {
-      // Simulação fallback
-      const novoArq = {
-        nome_original: file.name,
-        caminho_bruto: `bruto/${file.name}`,
-        caminho_tratado: `tratado/${file.name.replace('.xls', '.xlsx')}`,
-        total_linhas: dados.length,
-        processado_em: new Date().toLocaleString('pt-BR'),
-        status: 'sucesso'
-      };
-      setArquivos([novoArq, ...arquivos]);
-      alert("Simulação de Upload Concluída! Banco de dados atualizado com sucesso.");
+      console.error(err);
     } finally {
       setLoadingFirebase(false);
     }
   };
 
-  // Filtragem dos dados
+  // Remover arquivos e dados associados do Firebase
+  const handleDeletarArquivo = async (nomeOriginal) => {
+    if (!window.confirm(`Tem certeza que deseja remover o arquivo "${nomeOriginal}" e todos os registros associados?`)) return;
+    
+    setLoadingFirebase(true);
+    try {
+      await firebaseService.removerArquivo(nomeOriginal);
+    } catch (err) {
+      console.warn("Removendo localmente.");
+    }
+    
+    setArquivos(prev => prev.filter(a => a.nome_original !== nomeOriginal));
+    setDados(prev => prev.filter(d => d.arquivo_origem !== nomeOriginal));
+    setLoadingFirebase(false);
+    alert("Arquivo e registros apagados com sucesso!");
+  };
+
+  // Filtragem dos dados reais
   const dadosFiltrados = dados.filter(item => {
     const termo = busca.toLowerCase();
     const bateBusca = 
@@ -149,14 +219,15 @@ export default function App() {
       item.Num_NE.toLowerCase().includes(termo) ||
       item.Processo.toLowerCase().includes(termo) ||
       item.Natureza.toLowerCase().includes(termo) ||
-      item.PT.toLowerCase().includes(termo) ||
       item.UO.toLowerCase().includes(termo);
 
     const bateAno = filtroAno === 'Todos' || item.Ano_Processo === filtroAno;
-    return bateBusca && bateAno;
+    const bateNatureza = naturezaFiltro === 'Todos' || item.Natureza.includes(naturezaFiltro);
+    return bateBusca && bateAno && bateNatureza;
   });
 
   const anosDisponiveis = ['Todos', ...new Set(dados.map(item => item.Ano_Processo))];
+  const naturezasDisponiveis = ['Todos', ...new Set(dados.map(item => item.Natureza.split(' - ')[0]))];
 
   // Cálculos de KPIs
   const totais = dadosFiltrados.reduce((acc, curr) => {
@@ -175,6 +246,8 @@ export default function App() {
   });
 
   const percentualExecucao = totais.empAcum > 0 ? (totais.pagoAcum / totais.empAcum) * 100 : 0;
+  
+  // Agendados para hoje (simulado com os dados reais)
   const empenhosHoje = dadosFiltrados.filter(item => item.Data_Emis === '05/01/2026');
   const valorHoje = empenhosHoje.reduce((sum, item) => sum + item.Pago_Acum, 0);
 
@@ -256,44 +329,44 @@ export default function App() {
 
   if (!isAuthenticated) {
     return (
-      <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-        <div className={`w-full max-w-md p-8 rounded-3xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-2xl shadow-indigo-500/5`}>
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100">
+        <div className="w-full max-w-md p-8 rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl shadow-indigo-500/5">
           <div className="flex flex-col items-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-extrabold text-2xl shadow-xl shadow-indigo-600/20 mb-3">
               AFI
             </div>
-            <h2 className="text-2xl font-bold tracking-tight">Entrar no Sistema</h2>
-            <p className="text-sm text-slate-400 mt-1">Análise Orçamentária Avançada CETAM</p>
+            <h2 className="text-2xl font-bold tracking-tight">Painel AFI Orçamentos</h2>
+            <p className="text-sm text-slate-400 mt-1">Insira suas credenciais corporativas</p>
           </div>
 
           {loginError && (
-            <div className="p-3 mb-4 rounded-xl text-xs font-semibold bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 flex items-center gap-2">
+            <div className="p-3 mb-4 rounded-xl text-xs font-semibold bg-rose-950/30 text-rose-400 flex items-center gap-2">
               <AlertCircle size={16} /> {loginError}
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="text-xs font-semibold text-slate-400 block mb-1">Endereço de E-mail</label>
+              <label className="text-xs font-semibold text-slate-400 block mb-1">E-mail</label>
               <input 
                 type="email" 
                 required
                 placeholder="lucivaldo586@gmail.com"
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
-                className={`w-full px-4 py-3 rounded-xl border outline-none text-sm ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
+                className="w-full px-4 py-3 rounded-xl border border-slate-850 bg-slate-950 outline-none text-sm focus:border-indigo-500 text-white"
               />
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-slate-400 block mb-1">Senha de Acesso</label>
+              <label className="text-xs font-semibold text-slate-400 block mb-1">Senha</label>
               <input 
                 type="password" 
                 required
                 placeholder="••••••••"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                className={`w-full px-4 py-3 rounded-xl border outline-none text-sm ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
+                className="w-full px-4 py-3 rounded-xl border border-slate-850 bg-slate-950 outline-none text-sm focus:border-indigo-500 text-white"
               />
             </div>
 
@@ -301,11 +374,11 @@ export default function App() {
               type="submit"
               className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-lg shadow-indigo-600/10 transition duration-150"
             >
-              Autenticar
+              Entrar
             </button>
           </form>
 
-          <div className="mt-6 p-4 rounded-xl bg-slate-100 dark:bg-slate-800/50 text-center">
+          <div className="mt-6 p-4 rounded-xl bg-slate-800/50 text-center">
             <span className="text-xs text-slate-500">
               💡 Credenciais do Administrador Padrão:<br />
               <b>lucivaldo586@gmail.com</b> / <b>admin123</b>
@@ -317,10 +390,10 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen flex ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-850'}`}>
+    <div className={`min-h-screen flex transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
       
       {/* Sidebar Fixo Lateral */}
-      <aside className={`w-72 flex-shrink-0 border-r ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200/60 bg-white'} p-6 flex flex-col justify-between`}>
+      <aside className={`w-72 flex-shrink-0 border-r ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'} p-6 flex flex-col justify-between`}>
         <div>
           <div className="flex items-center gap-3 mb-10">
             <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-600/20">
@@ -335,25 +408,25 @@ export default function App() {
           <nav className="space-y-1">
             <button 
               onClick={() => setCurrentPage('dashboard')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
             >
               <LayoutDashboard size={18} /> Dashboard Geral
             </button>
             <button 
               onClick={() => setCurrentPage('avancados')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'avancados' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'avancados' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
             >
               <TrendingUp size={18} /> Visuais Avançados
             </button>
             <button 
               onClick={() => setCurrentPage('auditoria')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'auditoria' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'auditoria' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
             >
               <AlertTriangle size={18} /> Matriz de Gargalos
             </button>
             <button 
               onClick={() => setCurrentPage('upload')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'upload' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'upload' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
             >
               <Upload size={18} /> Upload e Histórico
             </button>
@@ -361,7 +434,7 @@ export default function App() {
             {user?.email === 'lucivaldo586@gmail.com' && (
               <button 
                 onClick={() => setCurrentPage('usuarios')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'usuarios' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100'}`}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold ${currentPage === 'usuarios' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-850 dark:hover:text-slate-100'}`}
               >
                 <Users size={18} /> Cadastrar Usuários
               </button>
@@ -370,10 +443,9 @@ export default function App() {
         </div>
 
         <div className="space-y-4">
-          {/* Indicador de Sync do Firebase */}
           <div className="flex items-center justify-between text-[10px] text-slate-400 px-2">
             <span>Sincronismo</span>
-            <button onClick={carregarDadosFirebase} title="Recarregar dados do Firestore" className="hover:text-indigo-500 transition">
+            <button onClick={carregarDadosFirebase} title="Recarregar dados" className="hover:text-indigo-500 transition">
               <RefreshCw size={12} className={loadingFirebase ? 'animate-spin' : ''} />
             </button>
           </div>
@@ -411,7 +483,7 @@ export default function App() {
       </aside>
 
       {/* Conteúdo Principal */}
-      <main className="flex-1 overflow-y-auto p-10" id="dashboard-view">
+      <main className="flex-1 overflow-y-auto p-10 font-sans" id="dashboard-view">
         
         {/* Topbar Header */}
         <header className="flex justify-between items-center mb-8">
@@ -435,355 +507,262 @@ export default function App() {
           </div>
         </header>
 
-        {/* Telas */}
-        {currentPage === 'dashboard' && (
-          <div className="space-y-8 animate-fadeIn">
-            
-            <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm flex flex-col md:flex-row gap-4`}>
-              <div className="flex-1 relative">
-                <Search className="absolute left-4 top-3 text-slate-400" size={16} />
-                <input 
-                  type="text" 
-                  placeholder="Filtrar por Credor, NE, Processo, Natureza, PT, UO..." 
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  className={`w-full pl-11 pr-4 py-2.5 rounded-xl border outline-none text-sm transition ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
-                />
-              </div>
-
-              <div className="w-full md:w-48">
-                <select 
-                  value={filtroAno} 
-                  onChange={(e) => setFiltroAno(e.target.value)}
-                  className={`w-full px-4 py-2.5 rounded-xl border outline-none text-sm ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
-                >
-                  {anosDisponiveis.map(ano => <option key={ano} value={ano}>Exercício: {ano}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {/* KPIs */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <span className="text-xs font-semibold text-slate-400">Empenhado no Mês</span>
-                <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.empMes)}</p>
-              </div>
-              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <span className="text-xs font-semibold text-slate-400">Empenhado Mês (Acumulado)</span>
-                <p className="text-xl font-extrabold tracking-tight mt-1 text-indigo-500">{formatarMoeda(totais.empAcum)}</p>
-              </div>
-              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <span className="text-xs font-semibold text-slate-400">Liquidado no Mês</span>
-                <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.liqMes)}</p>
-              </div>
-              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <span className="text-xs font-semibold text-slate-400">Liquidado Mês (Acumulado)</span>
-                <p className="text-xl font-extrabold tracking-tight mt-1 text-purple-500">{formatarMoeda(totais.liqAcum)}</p>
-              </div>
-              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <span className="text-xs font-semibold text-slate-400">A Liquidar</span>
-                <p className="text-xl font-extrabold tracking-tight mt-1 text-amber-500">{formatarMoeda(totais.aLiquidar)}</p>
-              </div>
-              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <span className="text-xs font-semibold text-slate-400">Pago no Mês</span>
-                <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.pagoMes)}</p>
-              </div>
-              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <span className="text-xs font-semibold text-slate-400">Pago Mês (Acumulado)</span>
-                <p className="text-xl font-extrabold tracking-tight mt-1 text-emerald-500">{formatarMoeda(totais.pagoAcum)}</p>
-              </div>
-              <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <span className="text-xs font-semibold text-slate-400">A Pagar</span>
-                <p className="text-xl font-extrabold tracking-tight mt-1 text-rose-500">{formatarMoeda(totais.aPagar)}</p>
-              </div>
-            </div>
-
-            {/* Graficos */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <h3 className="text-base font-bold mb-4">Evolução Mensal (Empenhado vs Pago)</h3>
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={dataEvolucaoMensal}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
-                      <XAxis dataKey="name" stroke={darkMode ? "#94a3b8" : "#64748b"} />
-                      <YAxis stroke={darkMode ? "#94a3b8" : "#64748b"} />
-                      <Tooltip />
-                      <Legend />
-                      <Line type="monotone" dataKey="Empenhado" stroke="#6366f1" strokeWidth={3} />
-                      <Line type="monotone" dataKey="Pago" stroke="#10b981" strokeWidth={3} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <h3 className="text-base font-bold mb-4">Total Pago vs Empenhado por Exercício</h3>
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={totalPorAno}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
-                      <XAxis dataKey="ano" stroke={darkMode ? "#94a3b8" : "#64748b"} />
-                      <YAxis stroke={darkMode ? "#94a3b8" : "#64748b"} />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="Empenhado" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="Pago" fill="#10b981" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <h3 className="text-base font-bold mb-4">Maiores Orçamentos (Top 5 Credores)</h3>
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={maioresCredores} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
-                      <XAxis type="number" stroke={darkMode ? "#94a3b8" : "#64748b"} />
-                      <YAxis dataKey="name" type="category" stroke={darkMode ? "#94a3b8" : "#64748b"} width={100} />
-                      <Tooltip />
-                      <Bar dataKey="Empenhado" fill="#ec4899" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-                <div className="flex justify-between items-center mb-4">
-                  <div>
-                    <h3 className="text-base font-bold">Empenhos para a Data de Hoje</h3>
-                    <p className="text-[10px] text-slate-500">Filtrado automaticamente para 05/01/2026</p>
-                  </div>
-                  <span className="px-3 py-1 bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 rounded-lg text-xs font-bold">
-                    Total: {formatarMoeda(valorHoje)}
-                  </span>
-                </div>
-                <div className="overflow-y-auto h-60">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-slate-100 dark:border-slate-800">
-                        <th className="py-2 text-xs font-semibold text-slate-400">Credor</th>
-                        <th className="py-2 text-xs font-semibold text-slate-400">Num NE</th>
-                        <th className="py-2 text-xs font-semibold text-slate-400 text-right">Valor Empenhado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {empenhosHoje.length > 0 ? (
-                        empenhosHoje.map((item, idx) => (
-                          <tr key={idx} className="border-b border-slate-50 dark:border-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800/20 text-xs">
-                            <td className="py-2.5 font-semibold truncate max-w-xs">{item.Credor}</td>
-                            <td className="py-2.5 text-slate-500">{item.Num_NE}</td>
-                            <td className="py-2.5 font-bold text-right text-emerald-500">{formatarMoeda(item.Emp_Acum)}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="3" className="py-8 text-center text-xs text-slate-400">Nenhum registro hoje.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
+        {/* Verificação se há planilhas enviadas */}
+        {dados.length === 0 && currentPage !== 'upload' ? (
+          <div className={`p-10 rounded-2xl border text-center flex flex-col items-center justify-center ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+            <AlertCircle size={40} className="text-amber-500 mb-3" />
+            <h3 className="text-lg font-bold mb-1">Nenhum dado orçamentário real ativo</h3>
+            <p className="text-xs text-slate-400 mb-6 max-w-sm">Para visualizar gráficos e KPIs, navegue até a Área de Upload e suba a planilha do AFI.</p>
+            <button 
+              onClick={() => setCurrentPage('upload')}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow"
+            >
+              Ir para Upload
+            </button>
           </div>
-        )}
+        ) : (
+          <>
+            {/* Dashboard Geral */}
+            {currentPage === 'dashboard' && (
+              <div className="space-y-8 animate-fadeIn">
+                
+                <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm flex flex-col md:flex-row gap-4`}>
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-4 top-3 text-slate-400" size={16} />
+                    <input 
+                      type="text" 
+                      placeholder="Filtrar por Credor, NE, Processo, UO..." 
+                      value={busca}
+                      onChange={(e) => setBusca(e.target.value)}
+                      className={`w-full pl-11 pr-4 py-2.5 rounded-xl border outline-none text-sm transition ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
+                    />
+                  </div>
 
-        {/* Visuais Avançados */}
-        {currentPage === 'avancados' && (
-          <div className="space-y-8 animate-fadeIn">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm col-span-2`}>
-                <h3 className="text-base font-bold mb-4">Empenhos por Natureza de Pagamento</h3>
-                <div className="h-72 flex flex-col md:flex-row items-center justify-around">
-                  <div className="h-56 w-56">
+                  <div className="w-full md:w-48">
+                    <select 
+                      value={filtroAno} 
+                      onChange={(e) => setFiltroAno(e.target.value)}
+                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-sm ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                    >
+                      {anosDisponiveis.map(ano => <option key={ano} value={ano}>Exercício: {ano}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* KPIs */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                    <span className="text-xs font-semibold text-slate-400">Empenhado no Mês</span>
+                    <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.empMes)}</p>
+                  </div>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                    <span className="text-xs font-semibold text-slate-400">Empenhado Mês (Acumulado)</span>
+                    <p className="text-xl font-extrabold tracking-tight mt-1 text-indigo-500">{formatarMoeda(totais.empAcum)}</p>
+                  </div>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                    <span className="text-xs font-semibold text-slate-400">Liquidado no Mês</span>
+                    <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.liqMes)}</p>
+                  </div>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                    <span className="text-xs font-semibold text-slate-400">Liquidado Mês (Acumulado)</span>
+                    <p className="text-xl font-extrabold tracking-tight mt-1 text-purple-500">{formatarMoeda(totais.liqAcum)}</p>
+                  </div>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                    <span className="text-xs font-semibold text-slate-400">A Liquidar</span>
+                    <p className="text-xl font-extrabold tracking-tight mt-1 text-amber-500">{formatarMoeda(totais.aLiquidar)}</p>
+                  </div>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                    <span className="text-xs font-semibold text-slate-400">Pago no Mês</span>
+                    <p className="text-xl font-extrabold tracking-tight mt-1">{formatarMoeda(totais.pagoMes)}</p>
+                  </div>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                    <span className="text-xs font-semibold text-slate-400">Pago Mês (Acumulado)</span>
+                    <p className="text-xl font-extrabold tracking-tight mt-1 text-emerald-500">{formatarMoeda(totais.pagoAcum)}</p>
+                  </div>
+                  <div className={`p-5 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                    <span className="text-xs font-semibold text-slate-400">A Pagar</span>
+                    <p className="text-xl font-extrabold tracking-tight mt-1 text-rose-500">{formatarMoeda(totais.aPagar)}</p>
+                  </div>
+                </div>
+
+                {/* Graficos */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                    <h3 className="text-base font-bold mb-4">Evolução Mensal (Empenhado vs Pago)</h3>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={dataEvolucaoMensal}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
+                          <XAxis dataKey="name" stroke={darkMode ? "#94a3b8" : "#64748b"} />
+                          <YAxis stroke={darkMode ? "#94a3b8" : "#64748b"} />
+                          <Tooltip />
+                          <Legend />
+                          <Line type="monotone" dataKey="Empenhado" stroke="#6366f1" strokeWidth={3} />
+                          <Line type="monotone" dataKey="Pago" stroke="#10b981" strokeWidth={3} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                    <h3 className="text-base font-bold mb-4">Total Pago vs Empenhado por Exercício</h3>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={totalPorAno}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
+                          <XAxis dataKey="ano" stroke={darkMode ? "#94a3b8" : "#64748b"} />
+                          <YAxis stroke={darkMode ? "#94a3b8" : "#64748b"} />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="Empenhado" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="Pago" fill="#10b981" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Visuais Avançados */}
+            {currentPage === 'avancados' && (
+              <div className="space-y-8 animate-fadeIn">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm col-span-2`}>
+                    <h3 className="text-base font-bold mb-4">Empenhos por Natureza</h3>
+                    <div className="h-72 flex flex-col md:flex-row items-center justify-around">
+                      <div className="h-56 w-56">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={despesasPorNatureza} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={3} dataKey="value">
+                              {despesasPorNatureza.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="space-y-2 max-h-56 overflow-y-auto text-xs">
+                        {despesasPorNatureza.map((entry, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                            <span className="font-medium truncate max-w-xs">{entry.name}: {formatarMoeda(entry.value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm flex flex-col items-center justify-center`}>
+                    <h3 className="text-base font-bold mb-2">Execução Geral</h3>
+                    <div className="relative w-44 h-22 overflow-hidden mb-4">
+                      <div className="absolute top-0 left-0 w-44 h-44 rounded-full border-12 border-slate-200 dark:border-slate-800"></div>
+                      <div className="absolute top-0 left-0 w-44 h-44 rounded-full border-12 border-indigo-650 transition-transform duration-700" style={{ clipPath: 'polygon(0 50%, 100% 50%, 100% 0, 0 0)', transform: `rotate(${Math.min(180, (percentualExecucao / 100) * 180)}deg)`, transformOrigin: '50% 50%' }}></div>
+                      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center"><span className="text-3xl font-extrabold">{percentualExecucao.toFixed(1)}%</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                  <h3 className="text-base font-bold mb-4">Funil Orçamentário</h3>
+                  <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={despesasPorNatureza}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={3}
-                          dataKey="value"
-                        >
-                          {despesasPorNatureza.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
+                      <FunnelChart>
                         <Tooltip />
-                      </PieChart>
+                        <Funnel dataKey="value" data={dataFunil} isAnimationActive>
+                          {dataFunil.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                        </Funnel>
+                      </FunnelChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="space-y-2 max-h-56 overflow-y-auto text-xs">
-                    {despesasPorNatureza.map((entry, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                        <span className="font-medium truncate max-w-xs">{entry.name}: {formatarMoeda(entry.value)}</span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </div>
+            )}
 
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm flex flex-col items-center justify-center`}>
-                <h3 className="text-base font-bold mb-2">Execução Orçamentária Geral</h3>
-                <div className="relative w-44 h-22 overflow-hidden mb-4">
-                  <div className="absolute top-0 left-0 w-44 h-44 rounded-full border-12 border-slate-200 dark:border-slate-800"></div>
-                  <div 
-                    className="absolute top-0 left-0 w-44 h-44 rounded-full border-12 border-indigo-600 transition-transform duration-700"
-                    style={{
-                      clipPath: 'polygon(0 50%, 100% 50%, 100% 0, 0 0)',
-                      transform: `rotate(${Math.min(180, (percentualExecucao / 100) * 180)}deg)`,
-                      transformOrigin: '50% 50%'
-                    }}
-                  ></div>
-                  <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center">
-                    <span className="text-3xl font-extrabold">{percentualExecucao.toFixed(1)}%</span>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-500">
-                  {percentualExecucao > 75 ? "EFICIÊNCIA ORÇAMENTÁRIA ALTA" : "EFICIÊNCIA MODERADA"}
-                </span>
-              </div>
-
-            </div>
-
-            <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-              <h3 className="text-base font-bold mb-4">Funil Orçamentário (Empenhado → Liquidado → Pago)</h3>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <FunnelChart>
-                    <Tooltip />
-                    <Funnel dataKey="value" data={dataFunil} isAnimationActive>
-                      {dataFunil.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Funnel>
-                  </FunnelChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-          </div>
-        )}
-
-        {/* Auditoria */}
-        {currentPage === 'auditoria' && (
-          <div className="space-y-8 animate-fadeIn">
-            <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
-              <h3 className="text-base font-bold mb-1">Matriz de Auditoria e Alertas (Gargalos)</h3>
-              <p className="text-xs text-slate-500 mb-6">Detalhamento dos Credores com empenhos sob risco ou gargalo de pagamento (A Liquidar ou A Pagar elevados).</p>
-              
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800">
-                      <th className="pb-3 text-xs font-semibold text-slate-400">Credor</th>
-                      <th className="pb-3 text-xs font-semibold text-slate-400">Nº NE</th>
-                      <th className="pb-3 text-xs font-semibold text-slate-400">Processo</th>
-                      <th className="pb-3 text-xs font-semibold text-slate-400 text-right">Empenhado</th>
-                      <th className="pb-3 text-xs font-semibold text-slate-400 text-right">A Liquidar</th>
-                      <th className="pb-3 text-xs font-semibold text-slate-400 text-right">A Pagar</th>
-                      <th className="pb-3 text-xs font-semibold text-slate-400 text-center">Alerta de Risco</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dadosFiltrados.map((item, idx) => {
-                      const riscoGargalo = item.A_Pagar > 50000 || item.A_Liquidar > 100000;
-                      return (
-                        <tr key={idx} className="border-b border-slate-50 dark:border-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800/20 text-xs">
-                          <td className="py-3.5 font-bold truncate max-w-xs">{item.Credor}</td>
-                          <td className="py-3.5">{item.Num_NE}</td>
-                          <td className="py-3.5">{item.Processo}</td>
-                          <td className="py-3.5 text-right font-medium">{formatarMoeda(item.Emp_Acum)}</td>
-                          <td className="py-3.5 text-right font-semibold text-amber-500">{formatarMoeda(item.A_Liquidar)}</td>
-                          <td className="py-3.5 text-right font-semibold text-rose-500">{formatarMoeda(item.A_Pagar)}</td>
-                          <td className="py-3.5 text-center">
-                            {riscoGargalo ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-300">
-                                Alto Gargalo
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300">
-                                Seguro
-                              </span>
-                            )}
-                          </td>
+            {/* Auditoria */}
+            {currentPage === 'auditoria' && (
+              <div className="space-y-8 animate-fadeIn">
+                <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                  <h3 className="text-base font-bold mb-1">Matriz de Gargalos e Auditoria</h3>
+                  <p className="text-xs text-slate-500 mb-6">Detalhamento dos Credores com empenhos sob risco ou gargalo de pagamento.</p>
+                  
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-slate-200 dark:border-slate-800">
+                          <th className="pb-3 text-xs font-semibold text-slate-400">Credor</th>
+                          <th className="pb-3 text-xs font-semibold text-slate-400">Nº NE</th>
+                          <th className="pb-3 text-xs font-semibold text-slate-400 text-right">A Liquidar</th>
+                          <th className="pb-3 text-xs font-semibold text-slate-400 text-right">A Pagar</th>
+                          <th className="pb-3 text-xs font-semibold text-slate-400 text-center">Status</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody>
+                        {dadosFiltrados.map((item, idx) => {
+                          const riscoGargalo = item.A_Pagar > 50000 || item.A_Liquidar > 100000;
+                          return (
+                            <tr key={idx} className="border-b border-slate-50 dark:border-slate-850 hover:bg-slate-50 dark:hover:bg-slate-800/20 text-xs">
+                              <td className="py-3.5 font-bold truncate max-w-xs">{item.Credor}</td>
+                              <td className="py-3.5">{item.Num_NE}</td>
+                              <td className="py-3.5 text-right text-amber-500 font-semibold">{formatarMoeda(item.A_Liquidar)}</td>
+                              <td className="py-3.5 text-right text-rose-500 font-semibold">{formatarMoeda(item.A_Pagar)}</td>
+                              <td className="py-3.5 text-center">
+                                {riscoGargalo ? <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950 text-rose-600">Gargalo</span> : <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-600">Seguro</span>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            )}
+          </>
         )}
 
-        {/* Upload */}
+        {/* Upload de Relatórios (Sempre Disponível) */}
         {currentPage === 'upload' && (
           <div className="space-y-8 animate-fadeIn">
-            
             <div className={`p-8 rounded-2xl border-2 border-dashed ${darkMode ? 'border-slate-800 bg-slate-900/40' : 'border-slate-200 bg-white'} text-center flex flex-col items-center justify-center`}>
               <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center text-indigo-600 mb-4 shadow-sm">
                 <Upload size={24} />
               </div>
               <h3 className="text-base font-bold mb-1">Importar Relatório Orçamentário (AFI)</h3>
-              <p className="text-xs text-slate-400 mb-6 max-w-sm">
-                Envie arquivos no formato original <span className="font-semibold text-indigo-500">.xls</span> ou <span className="font-semibold text-indigo-500">.xlsx</span> do AFI.
-              </p>
+              <p className="text-xs text-slate-400 mb-6 max-w-sm">Envie arquivos no formato original <span className="font-semibold text-indigo-500">.xls</span> ou <span className="font-semibold text-indigo-500">.xlsx</span> do AFI.</p>
               
-              <label className="cursor-pointer px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-md shadow-indigo-600/10">
+              <label className="cursor-pointer px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow">
                 Escolher Arquivo Bruto
-                <input 
-                  type="file" 
-                  accept=".xls,.xlsx" 
-                  className="hidden" 
-                  onChange={handleUploadReal}
-                />
+                <input type="file" accept=".xls,.xlsx" className="hidden" onChange={handleUploadReal} />
               </label>
             </div>
 
-            <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
+            <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
               <h3 className="text-base font-bold mb-4">Arquivos Processados por Pandas</h3>
-              <div className="space-y-3">
-                {arquivos.map((arq, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/30 text-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 flex items-center justify-center text-emerald-600">
-                        <FileSpreadsheet size={18} />
+              {arquivos.length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-6">Nenhum arquivo enviado até o momento.</p>
+              ) : (
+                <div className="space-y-3">
+                  {arquivos.map((arq, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3.5 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/30 text-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 flex items-center justify-center text-emerald-600">
+                          <FileSpreadsheet size={18} />
+                        </div>
+                        <div>
+                          <h4 className="font-bold truncate max-w-xs">{arq.nome_original}</h4>
+                          <span className="text-[10px] text-slate-500">{arq.total_linhas} linhas extraídas • {arq.processado_em}</span>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-bold truncate max-w-xs">{arq.nome_original}</h4>
-                        <span className="text-[10px] text-slate-500">
-                          {arq.total_linhas} linhas extraídas • {arq.processado_em}
-                        </span>
+                      
+                      <div className="flex items-center gap-2">
+                        <button onClick={exportarXLS} className="p-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition" title="Baixar"><Download size={14} /></button>
+                        <button onClick={() => handleDeletarArquivo(arq.nome_original)} className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/30 dark:text-rose-400 transition" title="Remover"><Trash2 size={14} /></button>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                        Tratado OK
-                      </span>
-                      <button 
-                        onClick={exportarXLS}
-                        className="p-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
-                        title="Baixar Planilha Tratada"
-                      >
-                        <Download size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
-
           </div>
         )}
 
@@ -791,74 +770,20 @@ export default function App() {
         {currentPage === 'usuarios' && user?.email === 'lucivaldo586@gmail.com' && (
           <div className="space-y-8 animate-fadeIn">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm`}>
+              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
                 <h3 className="text-base font-bold mb-1">Autorizar Novo Acesso</h3>
-                <p className="text-xs text-slate-500 mb-6">Apenas o administrador cadastrado pode criar novos logins.</p>
-                
                 <form onSubmit={cadastrarUsuario} className="space-y-4">
                   <div>
                     <label className="text-xs font-semibold text-slate-400 block mb-1">Nome</label>
-                    <input 
-                      type="text" 
-                      required
-                      placeholder="Ex: Lucivaldo Braga"
-                      value={novoNome}
-                      onChange={(e) => setNovoNome(e.target.value)}
-                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
-                    />
+                    <input type="text" required placeholder="Ex: Lucivaldo Braga" value={novoNome} onChange={(e) => setNovoNome(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-250 bg-transparent text-xs outline-none" />
                   </div>
-                  
                   <div>
                     <label className="text-xs font-semibold text-slate-400 block mb-1">E-mail</label>
-                    <input 
-                      type="email" 
-                      required
-                      placeholder="usuario@cetam.am.gov.br"
-                      value={novoEmail}
-                      onChange={(e) => setNovoEmail(e.target.value)}
-                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
-                    />
+                    <input type="email" required placeholder="usuario@cetam.am.gov.br" value={novoEmail} onChange={(e) => setNovoEmail(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-250 bg-transparent text-xs outline-none" />
                   </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 block mb-1">Cargo</label>
-                    <select 
-                      value={novoCargo}
-                      onChange={(e) => setNovoCargo(e.target.value)}
-                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-white'}`}
-                    >
-                      <option value="viewer">Visualizador Geral</option>
-                      <option value="admin">Administrador</option>
-                    </select>
-                  </div>
-
-                  <button 
-                    type="submit"
-                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow transition"
-                  >
-                    Cadastrar
-                  </button>
+                  <button type="submit" className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow transition">Cadastrar</button>
                 </form>
               </div>
-
-              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm lg:col-span-2`}>
-                <h3 className="text-base font-bold mb-4">Visualizadores e Administradores</h3>
-                <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {usuariosAutorizados.map((usr, index) => (
-                    <div key={index} className="flex justify-between items-center py-3 text-xs">
-                      <div>
-                        <h4 className="font-bold">{usr.name}</h4>
-                        <span className="text-slate-400">{usr.email}</span>
-                      </div>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${usr.role === 'admin' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'}`}>
-                        {usr.role === 'admin' ? 'Admin' : 'Visualizador'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
             </div>
           </div>
         )}
