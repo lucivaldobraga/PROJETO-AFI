@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, FunnelChart, Funnel
+  PieChart, Pie, Cell, FunnelChart, Funnel, LabelList
 } from 'recharts';
 import {
   LayoutDashboard, TrendingUp, AlertTriangle, Upload, Users, LogOut, Sun, Moon, Search,
@@ -406,11 +406,52 @@ export default function App() {
     return bateBusca && bateAno && bateCredor && bateNE && bateProcesso && bateUO;
   });
 
-  const anosDisponiveis = ['Todos', ...new Set(dados.map(item => item.Ano_Processo))].sort();
-  const credoresDisponiveis = ['Todos', ...new Set(dados.map(item => item.Credor))].sort();
-  const neDisponiveis = ['Todos', ...new Set(dados.map(item => item.Num_NE))].sort();
-  const processosDisponiveis = ['Todos', ...new Set(dados.map(item => item.Processo))].sort();
-  const uoDisponiveis = ['Todos', ...new Set(dados.map(item => item.UO))].sort();
+  // Filtrar opções de cada seletor com base nas outras seleções
+  const dadosParaAnos = dados.filter(item => {
+    const bateCredor = filtroCredor === 'Todos' || !filtroCredor || item.Credor.toLowerCase().includes(filtroCredor.toLowerCase());
+    const bateNE = filtroNE === 'Todos' || !filtroNE || item.Num_NE.toLowerCase().includes(filtroNE.toLowerCase());
+    const bateProcesso = filtroProcesso === 'Todos' || !filtroProcesso || item.Processo.toLowerCase().includes(filtroProcesso.toLowerCase());
+    const bateUO = filtroUO === 'Todos' || !filtroUO || item.UO.toLowerCase().includes(filtroUO.toLowerCase());
+    return bateCredor && bateNE && bateProcesso && bateUO;
+  });
+
+  const dadosParaCredores = dados.filter(item => {
+    const bateAno = filtroAno === 'Todos' || item.Ano_Processo === filtroAno;
+    const bateNE = filtroNE === 'Todos' || !filtroNE || item.Num_NE.toLowerCase().includes(filtroNE.toLowerCase());
+    const bateProcesso = filtroProcesso === 'Todos' || !filtroProcesso || item.Processo.toLowerCase().includes(filtroProcesso.toLowerCase());
+    const bateUO = filtroUO === 'Todos' || !filtroUO || item.UO.toLowerCase().includes(filtroUO.toLowerCase());
+    return bateAno && bateNE && bateProcesso && bateUO;
+  });
+
+  const dadosParaNEs = dados.filter(item => {
+    const bateAno = filtroAno === 'Todos' || item.Ano_Processo === filtroAno;
+    const bateCredor = filtroCredor === 'Todos' || !filtroCredor || item.Credor.toLowerCase().includes(filtroCredor.toLowerCase());
+    const bateProcesso = filtroProcesso === 'Todos' || !filtroProcesso || item.Processo.toLowerCase().includes(filtroProcesso.toLowerCase());
+    const bateUO = filtroUO === 'Todos' || !filtroUO || item.UO.toLowerCase().includes(filtroUO.toLowerCase());
+    return bateAno && bateCredor && bateProcesso && bateUO;
+  });
+
+  const dadosParaProcessos = dados.filter(item => {
+    const bateAno = filtroAno === 'Todos' || item.Ano_Processo === filtroAno;
+    const bateCredor = filtroCredor === 'Todos' || !filtroCredor || item.Credor.toLowerCase().includes(filtroCredor.toLowerCase());
+    const bateNE = filtroNE === 'Todos' || !filtroNE || item.Num_NE.toLowerCase().includes(filtroNE.toLowerCase());
+    const bateUO = filtroUO === 'Todos' || !filtroUO || item.UO.toLowerCase().includes(filtroUO.toLowerCase());
+    return bateAno && bateCredor && bateNE && bateUO;
+  });
+
+  const dadosParaUOs = dados.filter(item => {
+    const bateAno = filtroAno === 'Todos' || item.Ano_Processo === filtroAno;
+    const bateCredor = filtroCredor === 'Todos' || !filtroCredor || item.Credor.toLowerCase().includes(filtroCredor.toLowerCase());
+    const bateNE = filtroNE === 'Todos' || !filtroNE || item.Num_NE.toLowerCase().includes(filtroNE.toLowerCase());
+    const bateProcesso = filtroProcesso === 'Todos' || !filtroProcesso || item.Processo.toLowerCase().includes(filtroProcesso.toLowerCase());
+    return bateAno && bateCredor && bateNE && bateProcesso;
+  });
+
+  const anosDisponiveis = ['Todos', ...new Set(dadosParaAnos.map(item => item.Ano_Processo))].sort();
+  const credoresDisponiveis = ['Todos', ...new Set(dadosParaCredores.map(item => item.Credor))].sort();
+  const neDisponiveis = ['Todos', ...new Set(dadosParaNEs.map(item => item.Num_NE))].sort();
+  const processosDisponiveis = ['Todos', ...new Set(dadosParaProcessos.map(item => item.Processo))].sort();
+  const uoDisponiveis = ['Todos', ...new Set(dadosParaUOs.map(item => item.UO))].sort();
 
   // Data de referência de Hoje (dinâmica sem fallback)
   const dataHojeRef = (() => {
@@ -567,12 +608,10 @@ export default function App() {
 
   const maioresCredores = [...dadosFiltrados]
     .sort((a, b) => b.Emp_Acum - a.Emp_Acum)
-    .slice(0, 5)
     .map(x => ({ name: x.Credor, Empenhado: x.Emp_Acum, Pago: x.Pago_Acum }));
 
   const chartDadosHoje = empenhosHoje
     .sort((a, b) => b.Emp_Acum - a.Emp_Acum)
-    .slice(0, 5)
     .map(x => ({
       name: x.Credor,
       Empenhado: x.Emp_Acum,
@@ -586,10 +625,10 @@ export default function App() {
       existente.Empenhado += item.Emp_Acum;
       existente.Pago += item.Pago_Acum;
     } else {
-      acc.push({ name: uo.length > 15 ? uo.substring(0, 15) + '...' : uo, Empenhado: item.Emp_Acum, Pago: item.Pago_Acum });
+      acc.push({ name: uo.length > 25 ? uo.substring(0, 25) + '...' : uo, Empenhado: item.Emp_Acum, Pago: item.Pago_Acum });
     }
     return acc;
-  }, []).sort((a, b) => b.Empenhado - a.Empenhado).slice(0, 5);
+  }, []).sort((a, b) => b.Empenhado - a.Empenhado);
 
   const dataFunil = [
     { value: totais.empAcum, name: 'Empenhado', fill: '#6366f1' },
@@ -916,30 +955,32 @@ export default function App() {
 
                   {/* Gráfico: Empenhos para a Data de Hoje */}
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm lg:col-span-2`}>
-                    <h3 className="text-base font-extrabold tracking-tight mb-4">Empenhos para a Data de Hoje (Top 5 Credores)</h3>
-                    <div className="h-64" style={{ minHeight: '250px', minWidth: '0' }}>
+                    <h3 className="text-base font-extrabold tracking-tight mb-4">Empenhos para a Data de Hoje</h3>
+                    <div className="h-64 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-800" style={{ minHeight: '250px', minWidth: '0' }}>
                       {empenhosHoje.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={chartDadosHoje} layout="vertical">
-                            <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#1e293b" : "#e2e8f0"} />
-                            <XAxis type="number" tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
-                            <YAxis dataKey="name" type="category" stroke={darkMode ? "#94a3b8" : "#64748b"} width={170} style={{ fontSize: '9px', fontFamily: 'Outfit, sans-serif' }} />
-                            <Tooltip
-                              contentStyle={{
-                                backgroundColor: darkMode ? '#0f172a' : '#ffffff',
-                                borderColor: darkMode ? '#1e293b' : '#e2e8f0',
-                                borderRadius: '12px',
-                                fontFamily: 'Outfit, sans-serif',
-                                fontSize: '11px',
-                                color: darkMode ? '#f8fafc' : '#0f172a'
-                              }}
-                              formatter={(value) => [formatarMoeda(value), '']}
-                            />
-                            <Legend wrapperStyle={{ fontFamily: 'Outfit, sans-serif', fontSize: '10px' }} />
-                            <Bar dataKey="Empenhado" fill="#6366f1" radius={[0, 4, 4, 0]} />
-                            <Bar dataKey="Pago" fill="#10b981" radius={[0, 4, 4, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
+                        <div style={{ height: `${Math.max(250, chartDadosHoje.length * 45)}px` }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartDadosHoje} layout="vertical">
+                              <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#1e293b" : "#e2e8f0"} />
+                              <XAxis type="number" tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
+                              <YAxis dataKey="name" type="category" stroke={darkMode ? "#94a3b8" : "#64748b"} width={170} style={{ fontSize: '9px', fontFamily: 'Outfit, sans-serif' }} />
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: darkMode ? '#0f172a' : '#ffffff',
+                                  borderColor: darkMode ? '#1e293b' : '#e2e8f0',
+                                  borderRadius: '12px',
+                                  fontFamily: 'Outfit, sans-serif',
+                                  fontSize: '11px',
+                                  color: darkMode ? '#f8fafc' : '#0f172a'
+                                }}
+                                formatter={(value) => [formatarMoeda(value), '']}
+                              />
+                              <Legend wrapperStyle={{ fontFamily: 'Outfit, sans-serif', fontSize: '10px' }} />
+                              <Bar dataKey="Empenhado" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                              <Bar dataKey="Pago" fill="#10b981" radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
                       ) : (
                         <div className="h-full flex items-center justify-center text-xs text-slate-400">
                           Nenhuma movimentação para esta data.
@@ -1045,54 +1086,58 @@ export default function App() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
-                    <h3 className="text-base font-bold mb-4">Maiores Orçamentos (Top 5 Credores)</h3>
-                    <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={maioresCredores} layout="vertical">
-                          <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
-                          <XAxis type="number" tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
-                          <YAxis dataKey="name" type="category" stroke={darkMode ? "#94a3b8" : "#64748b"} width={170} style={{ fontSize: '9px', fontFamily: 'Outfit, sans-serif' }} />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: darkMode ? '#0f172a' : '#ffffff',
-                              borderColor: darkMode ? '#1e293b' : '#e2e8f0',
-                              borderRadius: '12px',
-                              fontFamily: 'Outfit, sans-serif',
-                              fontSize: '11px',
-                              color: darkMode ? '#f8fafc' : '#0f172a'
-                            }}
-                            formatter={(value) => [formatarMoeda(value), '']}
-                          />
-                          <Bar dataKey="Empenhado" fill="#ec4899" radius={[0, 4, 4, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
+                    <h3 className="text-base font-bold mb-4">Maiores Orçamentos por Credor</h3>
+                    <div className="h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-800" style={{ minHeight: '320px', minWidth: '0' }}>
+                      <div style={{ height: `${Math.max(320, maioresCredores.length * 45)}px` }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={maioresCredores} layout="vertical">
+                            <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
+                            <XAxis type="number" tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
+                            <YAxis dataKey="name" type="category" stroke={darkMode ? "#94a3b8" : "#64748b"} width={170} style={{ fontSize: '9px', fontFamily: 'Outfit, sans-serif' }} />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: darkMode ? '#0f172a' : '#ffffff',
+                                borderColor: darkMode ? '#1e293b' : '#e2e8f0',
+                                borderRadius: '12px',
+                                fontFamily: 'Outfit, sans-serif',
+                                fontSize: '11px',
+                                color: darkMode ? '#f8fafc' : '#0f172a'
+                              }}
+                              formatter={(value) => [formatarMoeda(value), '']}
+                            />
+                            <Bar dataKey="Empenhado" fill="#ec4899" radius={[0, 4, 4, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   </div>
 
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
-                    <h3 className="text-base font-bold mb-4">Maiores Gastos por Unidade Orçamentária (Top 5 UOs)</h3>
-                    <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={despesasPorUO}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
-                          <XAxis dataKey="name" stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '9px', fontFamily: 'Outfit, sans-serif' }} />
-                          <YAxis tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: darkMode ? '#0f172a' : '#ffffff',
-                              borderColor: darkMode ? '#1e293b' : '#e2e8f0',
-                              borderRadius: '12px',
-                              fontFamily: 'Outfit, sans-serif',
-                              fontSize: '11px',
-                              color: darkMode ? '#f8fafc' : '#0f172a'
-                            }}
-                            formatter={(value) => [formatarMoeda(value), '']}
-                          />
-                          <Legend wrapperStyle={{ fontFamily: 'Outfit, sans-serif', fontSize: '11px' }} />
-                          <Bar dataKey="Empenhado" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey="Pago" fill="#10b981" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
+                    <h3 className="text-base font-bold mb-4">Maiores Gastos por Unidade Orçamentária (UO)</h3>
+                    <div className="h-80 overflow-x-auto overflow-y-hidden pr-2 scrollbar-thin scrollbar-thumb-slate-800" style={{ minHeight: '320px', minWidth: '0' }}>
+                      <div style={{ width: `${Math.max(450, despesasPorUO.length * 85)}px`, height: '100%' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={despesasPorUO}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
+                            <XAxis dataKey="name" stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '9px', fontFamily: 'Outfit, sans-serif' }} />
+                            <YAxis tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} style={{ fontSize: '10px', fontFamily: 'Outfit, sans-serif' }} />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: darkMode ? '#0f172a' : '#ffffff',
+                                borderColor: darkMode ? '#1e293b' : '#e2e8f0',
+                                borderRadius: '12px',
+                                fontFamily: 'Outfit, sans-serif',
+                                fontSize: '11px',
+                                color: darkMode ? '#f8fafc' : '#0f172a'
+                              }}
+                              formatter={(value) => [formatarMoeda(value), '']}
+                            />
+                            <Legend wrapperStyle={{ fontFamily: 'Outfit, sans-serif', fontSize: '11px' }} />
+                            <Bar dataKey="Empenhado" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="Pago" fill="#10b981" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1107,21 +1152,59 @@ export default function App() {
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm col-span-2`}>
                     <h3 className="text-base font-bold mb-4">Empenhos por Natureza</h3>
                     <div className="h-80 flex flex-col md:flex-row items-center justify-around">
-                      <div className="h-64 w-64">
+                      <div className="h-64 w-full md:w-3/5">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
-                            <Pie data={despesasPorNatureza} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={3} dataKey="value">
+                            <Pie 
+                              data={despesasPorNatureza} 
+                              cx="50%" 
+                              cy="50%" 
+                              innerRadius={45} 
+                              outerRadius={65} 
+                              paddingAngle={3} 
+                              dataKey="value"
+                              label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
+                                const RADIAN = Math.PI / 180;
+                                const radius = outerRadius + 15;
+                                const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                return (
+                                  <text
+                                    x={x}
+                                    y={y}
+                                    fill={darkMode ? '#94a3b8' : '#475569'}
+                                    textAnchor={x > cx ? 'start' : 'end'}
+                                    dominantBaseline="central"
+                                    className="text-[9px] font-bold"
+                                  >
+                                    {`${name} (${(percent * 100).toFixed(2)}%)`}
+                                  </text>
+                                );
+                              }}
+                              labelLine={{ stroke: darkMode ? '#475569' : '#cbd5e1', strokeWidth: 1 }}
+                            >
                               {despesasPorNatureza.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                             </Pie>
                             <Tooltip formatter={(value) => [formatarMoeda(value), '']} />
+                            <Legend 
+                              verticalAlign="bottom" 
+                              height={32} 
+                              iconType="circle"
+                              iconSize={6}
+                              formatter={(value) => (
+                                <span className="text-slate-600 dark:text-slate-400 text-[10px] font-bold">
+                                  {value}
+                                </span>
+                              )}
+                            />
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
-                      <div className="space-y-2 max-h-64 overflow-y-auto pr-4 text-xs scrollbar-thin">
+                      <div className="space-y-2 max-h-64 overflow-y-auto pr-4 text-xs scrollbar-thin w-full md:w-2/5">
                         {despesasPorNatureza.map((entry, index) => (
                           <div key={index} className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                            <span className="font-medium text-slate-800 dark:text-slate-200 truncate max-w-xs">{entry.name}: {formatarMoeda(entry.value)}</span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-300 truncate max-w-xs">{entry.name}: <strong className="text-slate-900 dark:text-slate-100">{formatarMoeda(entry.value)}</strong></span>
                           </div>
                         ))}
                       </div>
@@ -1130,26 +1213,31 @@ export default function App() {
 
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm flex flex-col items-center justify-center`}>
                     <h3 className="text-base font-bold mb-2">Execução Geral</h3>
-                    <div className="relative w-48 h-24 overflow-hidden mb-4 flex items-center justify-center">
-                      <PieChart width={192} height={192} style={{ position: 'absolute', top: 0 }}>
+                    <div className="relative w-[320px] h-[160px] overflow-hidden mb-2 flex items-center justify-center">
+                      <PieChart width={320} height={320} style={{ position: 'absolute', top: 0 }}>
                         <Pie
                           data={[
                             { value: Math.min(100, percentualExecucao), fill: '#4f46e5' },
                             { value: Math.max(0, 100 - Math.min(100, percentualExecucao)), fill: darkMode ? '#1e293b' : '#e2e8f0' }
                           ]}
-                          cx={96}
-                          cy={96}
+                          cx={160}
+                          cy={160}
                           startAngle={180}
                           endAngle={0}
-                          innerRadius={65}
-                          outerRadius={85}
+                          innerRadius={110}
+                          outerRadius={140}
                           dataKey="value"
                           stroke="none"
                         />
                       </PieChart>
                       <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center justify-end">
-                        <span className="text-2xl font-extrabold text-slate-800 dark:text-white leading-none">{percentualExecucao.toFixed(1)}%</span>
+                        <span className="text-3xl font-extrabold text-slate-800 dark:text-white leading-none">{percentualExecucao.toFixed(2)}%</span>
                       </div>
+                    </div>
+                    {/* Contador de 0% a 100% abaixo do gráfico */}
+                    <div className="flex justify-between w-[280px] text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-2">
+                      <span>0.00%</span>
+                      <span>100.00%</span>
                     </div>
                   </div>
                 </div>
@@ -1162,9 +1250,25 @@ export default function App() {
                         <Tooltip formatter={(value) => [formatarMoeda(value), '']} />
                         <Funnel dataKey="value" data={dataFunil} isAnimationActive>
                           {dataFunil.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                          <LabelList position="inside" dataKey="name" fill="#ffffff" stroke="none" style={{ fontWeight: 'bold', fontSize: '12px' }} />
                         </Funnel>
                       </FunnelChart>
                     </ResponsiveContainer>
+                  </div>
+                  {/* Legenda Customizada para o Funil */}
+                  <div className="flex flex-wrap justify-center gap-6 mt-6 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-[#6366f1]"></div>
+                      <span>Empenhado: <strong className="text-slate-800 dark:text-slate-200">{formatarMoeda(totais.empAcum)}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-[#8b5cf6]"></div>
+                      <span>Liquidado: <strong className="text-slate-800 dark:text-slate-200">{formatarMoeda(totais.liqAcum)}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-[#10b981]"></div>
+                      <span>Pago: <strong className="text-slate-800 dark:text-slate-200">{formatarMoeda(totais.pagoAcum)}</strong></span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1248,7 +1352,7 @@ export default function App() {
                                   <td className="py-3.5 text-right text-amber-500 font-semibold">{formatarMoeda(item.A_Liquidar)}</td>
                                   <td className="py-3.5 text-right text-rose-500 font-semibold">{formatarMoeda(item.A_Pagar)}</td>
                                   <td className="py-3.5 text-center">
-                                    {riscoGargalo ? <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950 text-rose-600">Gargalo</span> : <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-600">Seguro</span>}
+                                    {riscoGargalo ? <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300">Gargalo</span> : <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">Seguro</span>}
                                   </td>
                                 </tr>
                               );
