@@ -921,29 +921,55 @@ export default function App() {
     return acc;
   }, []).sort((a, b) => a.ano.localeCompare(b.ano));
 
-  const maioresCredores = [...dadosFiltrados]
-    .sort((a, b) => b.Emp_Acum - a.Emp_Acum)
-    .map(x => ({ name: x.Credor, Empenhado: x.Emp_Acum, Pago: x.Pago_Acum }));
+  const maioresCredores = (() => {
+    const agrupado = dadosFiltrados.reduce((acc, item) => {
+      const credor = item.Credor || "Sem Credor";
+      const existente = acc.find(x => x.name === credor);
+      if (existente) {
+        existente.Empenhado += item.Emp_Acum || 0;
+        existente.Pago += item.Pago_Acum || 0;
+      } else {
+        acc.push({ name: credor, Empenhado: item.Emp_Acum || 0, Pago: item.Pago_Acum || 0 });
+      }
+      return acc;
+    }, []);
+    return agrupado.sort((a, b) => b.Empenhado - a.Empenhado);
+  })();
 
-  const chartDadosHoje = empenhosHoje
-    .sort((a, b) => b.Emp_Acum - a.Emp_Acum)
-    .map(x => ({
-      name: x.Credor,
-      Empenhado: x.Emp_Acum,
-      Pago: x.Pago_Acum
-    }));
+  const chartDadosHoje = (() => {
+    const agrupado = empenhosHoje.reduce((acc, item) => {
+      const credor = item.Credor || "Sem Credor";
+      const existente = acc.find(x => x.name === credor);
+      if (existente) {
+        existente.Empenhado += item.Emp_Acum || 0;
+        existente.Pago += item.Pago_Acum || 0;
+      } else {
+        acc.push({ name: credor, Empenhado: item.Emp_Acum || 0, Pago: item.Pago_Acum || 0 });
+      }
+      return acc;
+    }, []);
+    return agrupado.sort((a, b) => b.Empenhado - a.Empenhado);
+  })();
 
-  const despesasPorUO = dadosFiltrados.reduce((acc, item) => {
-    const uo = item.UO || "Sem UO";
-    const existente = acc.find(x => x.name === uo);
-    if (existente) {
-      existente.Empenhado += item.Emp_Acum;
-      existente.Pago += item.Pago_Acum;
-    } else {
-      acc.push({ name: uo.length > 25 ? uo.substring(0, 25) + '...' : uo, Empenhado: item.Emp_Acum, Pago: item.Pago_Acum });
-    }
-    return acc;
-  }, []).sort((a, b) => b.Empenhado - a.Empenhado);
+  const despesasPorUO = (() => {
+    const agrupado = dadosFiltrados.reduce((acc, item) => {
+      const uo = item.UO || "Sem UO";
+      const existente = acc.find(x => x.fullName === uo);
+      if (existente) {
+        existente.Empenhado += item.Emp_Acum || 0;
+        existente.Pago += item.Pago_Acum || 0;
+      } else {
+        acc.push({ 
+          fullName: uo, 
+          name: uo.length > 25 ? uo.substring(0, 25) + '...' : uo, 
+          Empenhado: item.Emp_Acum || 0, 
+          Pago: item.Pago_Acum || 0 
+        });
+      }
+      return acc;
+    }, []);
+    return agrupado.sort((a, b) => b.Empenhado - a.Empenhado);
+  })();
 
   const dataFunil = [
     { value: totais.empAcum, name: 'Empenhado', fill: '#6366f1' },
