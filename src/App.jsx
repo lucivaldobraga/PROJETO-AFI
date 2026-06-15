@@ -12,6 +12,7 @@ import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 import { firebaseService } from './firebase';
 import { tratarRelatorioAfi } from './parser';
+import logoImg from './assets/logo.png';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#d946ef', '#ec4899', '#f43f5e', '#3b82f6', '#06b6d4', '#10b981'];
 
@@ -627,7 +628,7 @@ export default function App() {
         <div className="w-full max-w-md p-8 rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl shadow-indigo-500/5">
           <div className="flex flex-col items-center mb-8">
             <img
-              src="/logo.png"
+              src={logoImg}
               alt="Logo CETAM"
               className="w-16 h-16 rounded-2xl object-contain shadow-xl shadow-indigo-600/10 mb-3"
             />
@@ -685,7 +686,7 @@ export default function App() {
         <div>
           <div className="flex items-center gap-3 mb-10">
             <img
-              src="/logo.png"
+              src={logoImg}
               alt="Logo CETAM"
               className="w-10 h-10 rounded-xl object-contain shadow-md"
             />
