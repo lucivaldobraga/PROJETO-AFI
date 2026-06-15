@@ -10,6 +10,7 @@ import {
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { firebaseService } from './firebase';
+import { tratarRelatorioAfi } from './parser';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#d946ef', '#ec4899', '#f43f5e', '#3b82f6', '#06b6d4', '#10b981'];
 
@@ -39,6 +40,16 @@ export default function App() {
   // Cadastro de Novo Usuário
   const [novoEmail, setNovoEmail] = useState('');
   const [novoNome, setNovoNome] = useState('');
+  const [novoCargo, setNovoCargo] = useState('viewer');
+
+  const cadastrarUsuario = (e) => {
+    e.preventDefault();
+    if (!novoEmail || !novoNome) return;
+    setUsuariosAutorizados(prev => [...prev, { email: novoEmail, name: novoNome, role: novoCargo }]);
+    setNovoEmail('');
+    setNovoNome('');
+    alert(`Usuário ${novoNome} autorizado com sucesso!`);
+  };
 
   // Monitorar Autenticação do Firebase
   useEffect(() => {
@@ -118,67 +129,30 @@ export default function App() {
     
     setLoadingFirebase(true);
     try {
-      await firebaseService.fazerUploadArquivo(file);
-      alert("Arquivo enviado para o Firebase Storage!");
-      carregarDadosFirebase();
-    } catch (err) {
-      // Simulação fallback com dados de teste estruturados
-      const mockLido = [
-        {
-          Num_NE: "2026NE0000001",
-          Credor: "PRODAM PROCESSAMENTO DE DADOS AMAZONAS S A",
-          Processo: "028201.002799/2025",
-          Data_Emis: "05/01/2026",
-          UO: "28201",
-          PT: "12122000126430001",
-          Fonte: "1.500.100.0.0000.0000",
-          Natureza: "33904004",
-          Emp_Mes: 0.00,
-          Emp_Acum: 1439048.12,
-          Liq_Mes: 0.00,
-          Liq_Acum: 750794.95,
-          A_Liquidar: 688253.17,
-          Pago_Mes: 0.00,
-          Pago_Acum: 750794.95,
-          A_Pagar: 0.00,
-          Ano_Processo: "2025",
-          arquivo_origem: file.name
-        },
-        {
-          Num_NE: "2026NE0000002",
-          Credor: "INSTITUTO NACIONAL TALENTOS - INTAL",
-          Processo: "028201.003902/2024",
-          Data_Emis: "05/01/2026",
-          UO: "28201",
-          PT: "12122000120010001",
-          Fonte: "1.500.100.0.0000.0000",
-          Natureza: "33903915",
-          Emp_Mes: 0.00,
-          Emp_Acum: 308747.80,
-          Liq_Mes: 0.00,
-          Liq_Acum: 193919.92,
-          A_Liquidar: 114827.88,
-          Pago_Mes: 0.00,
-          Pago_Acum: 193919.92,
-          A_Pagar: 0.00,
-          Ano_Processo: "2024",
-          arquivo_origem: file.name
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const fileBuffer = evt.target.result;
+          const registros = tratarRelatorioAfi(fileBuffer);
+          
+          if (registros.length === 0) {
+            alert("Nenhum registro encontrado ou formato de planilha inválido.");
+            setLoadingFirebase(false);
+            return;
+          }
+          
+          await firebaseService.adicionarRegistros(registros, file.name);
+          alert(`Planilha processada com sucesso! ${registros.length} empenhos importados.`);
+          await carregarDadosFirebase();
+        } catch (err) {
+          console.error(err);
+          alert("Erro ao processar planilha: " + err.message);
+          setLoadingFirebase(false);
         }
-      ];
-
-      setDados(prev => [...mockLido, ...prev]);
-      setArquivos(prev => [
-        {
-          nome_original: file.name,
-          caminho_bruto: `bruto/${file.name}`,
-          caminho_tratado: `tratado/${file.name.replace('.xls', '.xlsx')}`,
-          total_linhas: mockLido.length,
-          processado_em: new Date().toLocaleString('pt-BR'),
-          status: 'sucesso'
-        },
-        ...prev
-      ]);
-    } finally {
+      };
+      reader.readAsArrayBuffer(file);
+    } catch (err) {
+      console.error(err);
       setLoadingFirebase(false);
     }
   };
@@ -545,7 +519,7 @@ export default function App() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
                     <h3 className="text-base font-bold mb-4">Evolução Mensal (Empenhado vs Pago)</h3>
-                    <div className="h-80">
+                    <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={dataEvolucaoMensal}>
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
@@ -562,7 +536,7 @@ export default function App() {
 
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
                     <h3 className="text-base font-bold mb-4">Total Pago vs Empenhado por Exercício</h3>
-                    <div className="h-80">
+                    <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={totalPorAno}>
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
@@ -581,8 +555,8 @@ export default function App() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
                     <h3 className="text-base font-bold mb-4">Maiores Orçamentos (Top 5 Credores)</h3>
-                    <div className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }}>
+                      <ResponsiveContainer width="100%" height="105%">
                         <BarChart data={maioresCredores} layout="vertical">
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#334155" : "#e2e8f0"} />
                           <XAxis type="number" tickFormatter={formatarEixoMoeda} stroke={darkMode ? "#94a3b8" : "#64748b"} />
@@ -774,6 +748,82 @@ export default function App() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Gerenciamento de Usuários */}
+        {currentPage === 'usuarios' && user?.email === 'lucivaldo586@gmail.com' && (
+          <div className="space-y-8 animate-fadeIn">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              
+              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm`}>
+                <h3 className="text-base font-bold mb-1">Autorizar Novo Acesso</h3>
+                <p className="text-xs text-slate-500 mb-6">Apenas o administrador cadastrado pode criar novos logins.</p>
+                
+                <form onSubmit={cadastrarUsuario} className="space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 block mb-1">Nome Completo</label>
+                    <input 
+                      type="text" 
+                      required
+                      placeholder="Ex: Lucivaldo Braga"
+                      value={novoNome}
+                      onChange={(e) => setNovoNome(e.target.value)}
+                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 block mb-1">E-mail</label>
+                    <input 
+                      type="email" 
+                      required
+                      placeholder="usuario@cetam.am.gov.br"
+                      value={novoEmail}
+                      onChange={(e) => setNovoEmail(e.target.value)}
+                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-400 block mb-1">Cargo</label>
+                    <select 
+                      value={novoCargo}
+                      onChange={(e) => setNovoCargo(e.target.value)}
+                      className={`w-full px-4 py-2.5 rounded-xl border outline-none text-xs ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                    >
+                      <option value="viewer">Visualizador Geral</option>
+                      <option value="admin">Administrador</option>
+                    </select>
+                  </div>
+
+                  <button 
+                    type="submit"
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow transition"
+                  >
+                    Cadastrar
+                  </button>
+                </form>
+              </div>
+
+              <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/50'} shadow-sm lg:col-span-2`}>
+                <h3 className="text-base font-bold mb-4">Visualizadores e Administradores</h3>
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {usuariosAutorizados.map((usr, index) => (
+                    <div key={index} className="flex justify-between items-center py-3 text-xs">
+                      <div>
+                        <h4 className="font-bold">{usr.name}</h4>
+                        <span className="text-slate-400">{usr.email}</span>
+                      </div>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${usr.role === 'admin' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'}`}>
+                        {usr.role === 'admin' ? 'Admin' : 'Visualizador'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
             </div>
           </div>
         )}
