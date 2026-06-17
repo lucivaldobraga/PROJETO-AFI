@@ -3,7 +3,8 @@ import {
   getAuth, 
   signInWithEmailAndPassword, 
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  createUserWithEmailAndPassword
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -16,7 +17,10 @@ import {
   orderBy,
   deleteDoc,
   doc,
-  writeBatch
+  writeBatch,
+  onSnapshot,
+  getDoc,
+  setDoc
 } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -46,12 +50,47 @@ if (!isDummyConfig) {
 let authChangeCallback = null;
 
 const mockService = {
+  obterUsuarios: async () => {
+    const stored = localStorage.getItem('afi_usuarios');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch (e) {}
+    }
+    const defaultList = [
+      { uid: 'default-admin', email: 'lucivaldo586@gmail.com', name: 'Lucivaldo Braga', role: 'admin', password: 'admin123', setor: 'Diretoria' }
+    ];
+    localStorage.setItem('afi_usuarios', JSON.stringify(defaultList));
+    return defaultList;
+  },
+  criarUsuario: async (email, password, perfil) => {
+    const usuarios = await mockService.obterUsuarios();
+    if (usuarios.some(u => u.email === email)) {
+      throw new Error("E-mail já cadastrado localmente!");
+    }
+    const novoUsuario = {
+      uid: 'local-' + Date.now(),
+      email,
+      password,
+      ...perfil
+    };
+    usuarios.push(novoUsuario);
+    localStorage.setItem('afi_usuarios', JSON.stringify(usuarios));
+    return novoUsuario;
+  },
+  removerUsuario: async (uid) => {
+    const usuarios = await mockService.obterUsuarios();
+    const filtrados = usuarios.filter(u => u.uid !== uid);
+    localStorage.setItem('afi_usuarios', JSON.stringify(filtrados));
+    return true;
+  },
   login: async (email, password) => {
-    if (email === 'lucivaldo586@gmail.com' && password === 'admin123') {
-      const mockUser = { email, name: 'Lucivaldo Braga', role: 'admin' };
-      localStorage.setItem('afi_user', JSON.stringify(mockUser));
-      if (authChangeCallback) authChangeCallback(mockUser);
-      return mockUser;
+    const usuarios = await mockService.obterUsuarios();
+    const usuarioExiste = usuarios.find(u => u.email === email && u.password === password);
+    if (usuarioExiste) {
+      localStorage.setItem('afi_user', JSON.stringify(usuarioExiste));
+      if (authChangeCallback) authChangeCallback(usuarioExiste);
+      return usuarioExiste;
     }
     throw new Error("Credenciais inválidas no modo Sandbox.");
   },
@@ -149,7 +188,34 @@ export const firebaseService = {
     if (firebaseService.isLocalSandbox()) {
       return mockService.login(email, password);
     }
-    return signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const profileDoc = await getDoc(doc(db, 'usuarios', userCredential.user.uid));
+    if (profileDoc.exists()) {
+      return {
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        ...profileDoc.data()
+      };
+    }
+    const fallbackProfile = {
+      uid: userCredential.user.uid,
+      email: userCredential.user.email,
+      name: userCredential.user.email.split('@')[0],
+      role: userCredential.user.email === 'lucivaldo586@gmail.com' ? 'admin' : 'viewer',
+      setor: 'Geral'
+    };
+    if (userCredential.user.email === 'lucivaldo586@gmail.com') {
+      await setDoc(doc(db, 'usuarios', userCredential.user.uid), {
+        name: 'Lucivaldo Braga',
+        email: userCredential.user.email,
+        role: 'admin',
+        setor: 'Diretoria'
+      });
+      fallbackProfile.name = 'Lucivaldo Braga';
+      fallbackProfile.role = 'admin';
+      fallbackProfile.setor = 'Diretoria';
+    }
+    return fallbackProfile;
   },
 
   logout: async () => {
@@ -163,7 +229,112 @@ export const firebaseService = {
     if (firebaseService.isLocalSandbox()) {
       return mockService.onAuthChange(callback);
     }
-    return onAuthStateChanged(auth, callback);
+    return onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        try {
+          const profileDoc = await getDoc(doc(db, 'usuarios', currentUser.uid));
+          if (profileDoc.exists()) {
+            callback({
+              uid: currentUser.uid,
+              email: currentUser.email,
+              ...profileDoc.data()
+            });
+          } else {
+            if (currentUser.email === 'lucivaldo586@gmail.com') {
+              await setDoc(doc(db, 'usuarios', currentUser.uid), {
+                name: 'Lucivaldo Braga',
+                email: currentUser.email,
+                role: 'admin',
+                setor: 'Diretoria'
+              });
+              callback({
+                uid: currentUser.uid,
+                email: currentUser.email,
+                name: 'Lucivaldo Braga',
+                role: 'admin',
+                setor: 'Diretoria'
+              });
+            } else {
+              callback({
+                uid: currentUser.uid,
+                email: currentUser.email,
+                name: currentUser.email.split('@')[0],
+                role: 'viewer',
+                setor: 'Geral'
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("Erro ao ler dados adicionais do perfil:", e);
+          callback({
+            uid: currentUser.uid,
+            email: currentUser.email,
+            name: currentUser.email.split('@')[0],
+            role: 'viewer'
+          });
+        }
+      } else {
+        callback(null);
+      }
+    });
+  },
+
+  obterUsuarios: async () => {
+    if (firebaseService.isLocalSandbox()) {
+      return mockService.obterUsuarios();
+    }
+    try {
+      const qSnapshot = await getDocs(collection(db, 'usuarios'));
+      const records = [];
+      qSnapshot.forEach((doc) => {
+        records.push({ uid: doc.id, ...doc.data() });
+      });
+      return records;
+    } catch (e) {
+      console.error("Erro ao obter usuários do Firestore:", e);
+      return mockService.obterUsuarios();
+    }
+  },
+
+  criarUsuario: async (email, password, perfil) => {
+    if (firebaseService.isLocalSandbox()) {
+      return mockService.criarUsuario(email, password, perfil);
+    }
+    try {
+      const secondaryAppName = 'SecondaryAuth' + Date.now();
+      const secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
+      const secondaryAuth = getAuth(secondaryApp);
+      
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      const uid = userCredential.user.uid;
+      
+      await signOut(secondaryAuth);
+      
+      await setDoc(doc(db, 'usuarios', uid), {
+        email,
+        name: perfil.name,
+        role: perfil.role,
+        setor: perfil.setor
+      });
+      
+      return { uid, email, ...perfil };
+    } catch (e) {
+      console.error("Erro ao criar usuário no Firebase Auth:", e);
+      throw e;
+    }
+  },
+
+  removerUsuario: async (uid) => {
+    if (firebaseService.isLocalSandbox()) {
+      return mockService.removerUsuario(uid);
+    }
+    try {
+      await deleteDoc(doc(db, 'usuarios', uid));
+      return true;
+    } catch (e) {
+      console.error("Erro ao remover usuário do Firestore:", e);
+      throw e;
+    }
   },
 
   obterOrcamentos: async () => {
@@ -265,6 +436,52 @@ export const firebaseService = {
     } catch (e) {
       console.error("Erro ao salvar no Firestore, usando fallback local:", e);
       await mockService.adicionarRegistrosLocais(registros, nomeArquivo);
+    }
+  },
+
+  assinarOrcamentos: (onUpdate) => {
+    if (firebaseService.isLocalSandbox()) {
+      onUpdate(JSON.parse(localStorage.getItem('afi_orcamentos') || '[]'));
+      return () => {};
+    }
+    const q = query(collection(db, 'orcamentos'), orderBy('Ano_Processo', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      const records = [];
+      snapshot.forEach((doc) => {
+        records.push({ id: doc.id, ...doc.data() });
+      });
+      onUpdate(records);
+    }, (error) => {
+      console.warn("Erro ao ouvir orçamentos:", error);
+    });
+  },
+
+  assinarArquivos: (onUpdate) => {
+    if (firebaseService.isLocalSandbox()) {
+      onUpdate(JSON.parse(localStorage.getItem('afi_arquivos') || '[]'));
+      return () => {};
+    }
+    const q = query(collection(db, 'arquivos'), orderBy('processado_em', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      const records = [];
+      snapshot.forEach((doc) => {
+        records.push({ id: doc.id, ...doc.data() });
+      });
+      onUpdate(records);
+    }, (error) => {
+      console.warn("Erro ao ouvir arquivos:", error);
+    });
+  },
+
+  atualizarPerfil: async (uid, perfil) => {
+    if (firebaseService.isLocalSandbox()) {
+      return;
+    }
+    try {
+      await setDoc(doc(db, 'usuarios', uid), perfil, { merge: true });
+    } catch (e) {
+      console.error("Erro ao atualizar perfil no Firestore:", e);
+      throw e;
     }
   }
 };

@@ -145,21 +145,22 @@ export default function App() {
   const [arquivos, setArquivos] = useState([]);
   const [loadingFirebase, setLoadingFirebase] = useState(false);
 
-  const [usuariosAutorizados, setUsuariosAutorizados] = useState(() => {
-    const stored = localStorage.getItem('afi_usuarios');
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (e) { }
+  const [usuariosAutorizados, setUsuariosAutorizados] = useState([]);
+
+  const carregarUsuarios = async () => {
+    try {
+      const lista = await firebaseService.obterUsuarios();
+      setUsuariosAutorizados(lista || []);
+    } catch (e) {
+      console.error("Erro ao carregar usuários:", e);
     }
-    return [
-      { email: 'lucivaldo586@gmail.com', name: 'Lucivaldo Braga', role: 'admin', password: 'admin123' }
-    ];
-  });
+  };
 
   useEffect(() => {
-    localStorage.setItem('afi_usuarios', JSON.stringify(usuariosAutorizados));
-  }, [usuariosAutorizados]);
+    if (isAuthenticated) {
+      carregarUsuarios();
+    }
+  }, [isAuthenticated]);
 
   // Estados Globais, Filtros e Temas
   const [darkMode, setDarkMode] = useState(true);
@@ -279,53 +280,84 @@ export default function App() {
     customAlert("Sucesso", `Setor "${clean}" adicionado com sucesso!`, "success");
   };
 
-  const cadastrarUsuario = (e) => {
+  const cadastrarUsuario = async (e) => {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
     }
-    if (!novoEmail || !novoNome || !novaSenha) return;
+    if (!novoEmail || !novoNome) return;
+    if (!editingEmail && !novaSenha) return;
 
-    if (editingEmail) {
-      setUsuariosAutorizados(prev => prev.map(u =>
-        u.email === editingEmail ? { ...u, name: novoNome, email: novoEmail, password: novaSenha, role: novoCargo, setor: novoSetor } : u
-      ));
-
-      // Se for o próprio usuário logado se editando, atualiza a sessão local
-      if (user && user.email.toLowerCase() === editingEmail.toLowerCase()) {
-        const updatedUser = {
-          email: novoEmail,
+    setLoadingFirebase(true);
+    try {
+      if (editingEmail) {
+        const targetUser = usuariosAutorizados.find(u => u.email === editingEmail);
+        if (!targetUser) throw new Error("Usuário não encontrado.");
+        
+        const perfilAtualizado = {
           name: novoNome,
           role: novoCargo,
-          setor: novoSetor,
-          password: novaSenha
+          setor: novoSetor
         };
-        localStorage.setItem('afi_user', JSON.stringify(updatedUser));
-        setUser(updatedUser);
+
+        if (firebaseService.isLocalSandbox()) {
+          const mockList = JSON.parse(localStorage.getItem('afi_usuarios') || '[]');
+          const newList = mockList.map(u =>
+            u.email === editingEmail ? { ...u, ...perfilAtualizado, email: novoEmail, password: novaSenha || u.password } : u
+          );
+          localStorage.setItem('afi_usuarios', JSON.stringify(newList));
+        } else {
+          await firebaseService.atualizarPerfil(targetUser.uid, perfilAtualizado);
+        }
+
+        if (user && user.email.toLowerCase() === editingEmail.toLowerCase()) {
+          const updatedUser = {
+            ...user,
+            email: novoEmail,
+            name: novoNome,
+            role: novoCargo,
+            setor: novoSetor
+          };
+          localStorage.setItem('afi_user', JSON.stringify(updatedUser));
+          setUser(updatedUser);
+        }
+
+        customAlert("Sucesso", `Usuário ${novoNome} atualizado com sucesso!`, "success");
+        setEditingEmail(null);
+      } else {
+        if (usuariosAutorizados.some(u => u.email === novoEmail)) {
+          customAlert("Aviso", "E-mail já cadastrado!", "warning");
+          return;
+        }
+
+        const perfil = {
+          name: novoNome,
+          role: novoCargo,
+          setor: novoSetor
+        };
+
+        await firebaseService.criarUsuario(novoEmail, novaSenha, perfil);
+        customAlert("Sucesso", `Usuário ${novoNome} cadastrado com sucesso!`, "success");
       }
 
-      customAlert("Sucesso", `Usuário ${novoNome} atualizado com sucesso!`, "success");
-      setEditingEmail(null);
-    } else {
-      if (usuariosAutorizados.some(u => u.email === novoEmail)) {
-        customAlert("Aviso", "E-mail já cadastrado!", "warning");
-        return;
-      }
-      setUsuariosAutorizados(prev => [...prev, { email: novoEmail, name: novoNome, password: novaSenha, role: novoCargo, setor: novoSetor }]);
-      customAlert("Sucesso", `Usuário ${novoNome} cadastrado com sucesso!`, "success");
+      setNovoEmail('');
+      setNovoNome('');
+      setNovaSenha('');
+      setNovoCargo('viewer');
+      setNovoSetor('');
+      await carregarUsuarios();
+    } catch (err) {
+      console.error("Erro ao gerenciar usuário:", err);
+      customAlert("Erro", "Falha ao processar: " + err.message, "error");
+    } finally {
+      setLoadingFirebase(false);
     }
-
-    setNovoEmail('');
-    setNovoNome('');
-    setNovaSenha('');
-    setNovoCargo('viewer');
-    setNovoSetor('');
   };
 
   const iniciarEdicao = (usr) => {
     setEditingEmail(usr.email);
     setNovoNome(usr.name);
     setNovoEmail(usr.email);
-    setNovaSenha(usr.password || '123456');
+    setNovaSenha('');
     setNovoCargo(usr.role);
     setNovoSetor(usr.setor || '');
   };
@@ -339,34 +371,65 @@ export default function App() {
       customAlert("Aviso", "Não é possível remover a si mesmo!", "warning");
       return;
     }
+    const targetUser = usuariosAutorizados.find(u => u.email === email);
+    if (!targetUser) return;
+    
     customConfirm(
       "Remover Usuário",
       `Deseja realmente remover o acesso do usuário ${email}?`,
-      () => {
-        setUsuariosAutorizados(prev => prev.filter(u => u.email !== email));
+      async () => {
+        setLoadingFirebase(true);
+        try {
+          await firebaseService.removerUsuario(targetUser.uid || targetUser.email);
+          customAlert("Sucesso", "Usuário removido com sucesso!", "success");
+          await carregarUsuarios();
+        } catch (err) {
+          console.error("Erro ao remover usuário:", err);
+          customAlert("Erro", "Falha ao remover usuário: " + err.message, "error");
+        } finally {
+          setLoadingFirebase(false);
+        }
       }
     );
   };
 
   // Monitorar Autenticação do Firebase
   useEffect(() => {
-    const unsubscribe = firebaseService.onAuthChange((currentUser) => {
-      if (currentUser) {
-        const dadosLocais = usuariosAutorizados.find(u => u.email.toLowerCase() === currentUser.email.toLowerCase());
-        setUser({
-          email: currentUser.email,
-          name: dadosLocais ? dadosLocais.name : (currentUser.displayName || currentUser.email.split('@')[0]),
-          role: currentUser.email === 'lucivaldo586@gmail.com' ? 'admin' : (dadosLocais ? dadosLocais.role : 'viewer')
-        });
+    let unsubscribeOrcamentos = null;
+    let unsubscribeArquivos = null;
+
+    const unsubscribeAuth = firebaseService.onAuthChange((profile) => {
+      if (profile) {
+        setUser(profile);
         setIsAuthenticated(true);
-        carregarDadosFirebase();
+        
+        // Ativar listeners em tempo real do Firestore
+        setLoadingFirebase(true);
+        unsubscribeOrcamentos = firebaseService.assinarOrcamentos((novosOrcamentos) => {
+          setDados(novosOrcamentos);
+          setLoadingFirebase(false);
+        });
+
+        unsubscribeArquivos = firebaseService.assinarArquivos((novosArquivos) => {
+          setArquivos(novosArquivos);
+          setLoadingFirebase(false);
+        });
       } else {
         setIsAuthenticated(false);
         setUser(null);
+        if (unsubscribeOrcamentos) unsubscribeOrcamentos();
+        if (unsubscribeArquivos) unsubscribeArquivos();
+        setDados([]);
+        setArquivos([]);
       }
     });
-    return () => unsubscribe();
-  }, [usuariosAutorizados]);
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeOrcamentos) unsubscribeOrcamentos();
+      if (unsubscribeArquivos) unsubscribeArquivos();
+    };
+  }, []);
 
   // Buscar dados reais do Firestore
   const carregarDadosFirebase = async () => {
@@ -448,21 +511,18 @@ export default function App() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError('');
-
-    // Validar usuário na lista local/sandbox primeiro
-    const usuarioExiste = usuariosAutorizados.find(u => u.email === emailInput);
-    if (usuarioExiste && usuarioExiste.password === passwordInput) {
-      localStorage.setItem('afi_user', JSON.stringify(usuarioExiste));
-      setUser(usuarioExiste);
-      setIsAuthenticated(true);
-      carregarDadosFirebase();
-      return;
-    }
+    setLoadingFirebase(true);
 
     try {
-      await firebaseService.login(emailInput, passwordInput);
+      const logado = await firebaseService.login(emailInput, passwordInput);
+      localStorage.setItem('afi_user', JSON.stringify(logado));
+      setUser(logado);
+      setIsAuthenticated(true);
     } catch (error) {
+      console.error(error);
       setLoginError('Credenciais incorretas ou falha de conexão.');
+    } finally {
+      setLoadingFirebase(false);
     }
   };
 
@@ -2205,7 +2265,9 @@ export default function App() {
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{usr.email}</p>
                         <div className="flex flex-col gap-y-1 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                           <div>Setor: <strong className="text-slate-700 dark:text-slate-200 font-bold">{usr.setor || (usr.email === 'lucivaldo586@gmail.com' ? 'Diretoria' : 'Não Informado')}</strong></div>
-                          <div>Senha: <code className="bg-slate-200/50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded font-mono font-bold text-[10px]">{usr.password || '123456'}</code></div>
+                          {firebaseService.isLocalSandbox() && (
+                            <div>Senha: <code className="bg-slate-200/50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded font-mono font-bold text-[10px]">{usr.password || '123456'}</code></div>
+                          )}
                         </div>
                       </div>
                       <div className="flex justify-end gap-2 pt-2 border-t border-slate-800/60">

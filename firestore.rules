@@ -16,21 +16,27 @@ service cloud.firestore {
       );
     }
 
+    // Helper: verifica se o usuário possui um perfil ativo cadastrado
+    function hasActiveProfile() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'lucivaldo586@gmail.com' ||
+        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+      );
+    }
+
     // Regra para coleção de orçamentos:
-    // Qualquer usuário autenticado pode ler dados. Apenas administradores podem inserir/atualizar/excluir.
     match /orcamentos/{document} {
-      allow read: if isAuthenticated();
+      allow read: if hasActiveProfile();
       allow write: if isAdmin();
     }
 
     // Regra para coleção de arquivos orçamentários:
     match /arquivos/{document} {
-      allow read: if isAuthenticated();
+      allow read: if hasActiveProfile();
       allow write: if isAdmin();
     }
 
     // Regra para gerenciamento de perfis de usuários:
-    // Apenas o Administrador Lucivaldo pode criar e editar perfis. Qualquer logado pode ler seu próprio perfil.
     match /usuarios/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       allow write: if isAdmin();
