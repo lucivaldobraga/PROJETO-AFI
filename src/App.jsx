@@ -1209,7 +1209,8 @@ export default function App() {
               <input
                 type="email"
                 required
-                placeholder="lucivaldo586@gmail.com"
+                autoComplete="username"
+                placeholder="usuario@cetam.am.gov.br"
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-850 bg-slate-950 outline-none text-sm focus:border-indigo-500 text-white"
@@ -1221,7 +1222,8 @@ export default function App() {
               <input
                 type="password"
                 required
-                placeholder="••••••••"
+                autoComplete="current-password"
+                placeholder="Digite sua senha"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-850 bg-slate-950 outline-none text-sm focus:border-indigo-500 text-white"
