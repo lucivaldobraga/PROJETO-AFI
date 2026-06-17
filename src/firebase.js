@@ -96,13 +96,46 @@ const mockService = {
     const orcamentos = JSON.parse(localStorage.getItem('afi_orcamentos') || '[]');
     const arquivos = JSON.parse(localStorage.getItem('afi_arquivos') || '[]');
     
-    const novosOrcamentos = [...registros.map(r => ({ ...r, arquivo_origem: nomeArquivo })), ...orcamentos];
+    // Converte orcamentos atuais para um Map baseado em Num_NE para fácil substituição/mesclagem
+    const orcamentoMap = new Map();
+    const semNe = [];
+    
+    for (const o of orcamentos) {
+      const ne = String(o.Num_NE || "").trim();
+      if (ne) {
+        orcamentoMap.set(ne, o);
+      } else {
+        semNe.push(o);
+      }
+    }
+    
+    for (const r of registros) {
+      const ne = String(r.Num_NE || "").trim();
+      if (ne) {
+        const existing = orcamentoMap.get(ne) || {};
+        orcamentoMap.set(ne, {
+          ...existing,
+          ...r,
+          arquivo_origem: nomeArquivo
+        });
+      } else {
+        semNe.push({
+          ...r,
+          arquivo_origem: nomeArquivo
+        });
+      }
+    }
+    
+    const novosOrcamentos = [...orcamentoMap.values(), ...semNe];
+    
+    // Evitar duplicar o arquivo de log se o mesmo arquivo for re-enviado
+    const arquivosFiltrados = arquivos.filter(a => a.nome_original !== nomeArquivo);
     const novosArquivos = [{
       nome_original: nomeArquivo,
       processado_em: new Date().toLocaleString('pt-BR'),
       total_linhas: registros.length,
       status: 'sucesso'
-    }, ...arquivos];
+    }, ...arquivosFiltrados];
     
     localStorage.setItem('afi_orcamentos', JSON.stringify(novosOrcamentos));
     localStorage.setItem('afi_arquivos', JSON.stringify(novosArquivos));
@@ -214,11 +247,18 @@ export const firebaseService = {
         const lote = registros.slice(i, i + chunk);
         const batch = writeBatch(db);
         for (const r of lote) {
-          const docOrcRef = doc(collection(db, 'orcamentos'));
+          const numNe = String(r.Num_NE || "").trim();
+          const docId = numNe.replace(/[\/\s#\?]/g, '_');
+          let docOrcRef;
+          if (!docId) {
+            docOrcRef = doc(collection(db, 'orcamentos'));
+          } else {
+            docOrcRef = doc(db, 'orcamentos', docId);
+          }
           batch.set(docOrcRef, {
             ...r,
             arquivo_origem: nomeArquivo
-          });
+          }, { merge: true });
         }
         await batch.commit();
       }

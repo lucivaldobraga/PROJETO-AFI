@@ -68,15 +68,21 @@ def processar_upload_afi(cloud_event):
         
         # Salva cada linha de orçamento no Firestore vinculado a este arquivo
         # Limita para evitar estouro de limite de gravação em lote se a planilha for gigantesca (em lotes de 500)
+        import re
         tamanho_lote = 400
         for i in range(0, len(registros), tamanho_lote):
             lote_atual = registros[i:i + tamanho_lote]
             batch_firestore = db.batch()
             for r in lote_atual:
-                doc_ref = db.collection("orcamentos").document()
+                num_ne = str(r.get("Num_NE", "")).strip()
+                doc_id = re.sub(r'[\/\s#\?]', '_', num_ne)
+                if not doc_id:
+                    doc_ref = db.collection("orcamentos").document()
+                else:
+                    doc_ref = db.collection("orcamentos").document(doc_id)
                 r["arquivo_origem"] = os.path.basename(file_name)
                 r["criado_em"] = firestore.SERVER_TIMESTAMP
-                batch_firestore.set(doc_ref, r)
+                batch_firestore.set(doc_ref, r, merge=True)
             batch_firestore.commit()
             
         print(f"🔥 {len(registros)} registros salvos com sucesso no Firestore!")

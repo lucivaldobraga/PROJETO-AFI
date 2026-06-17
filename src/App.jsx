@@ -166,11 +166,49 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [busca, setBusca] = useState('');
   const [filtroAno, setFiltroAno] = useState('Todos');
+  const [filtroMes, setFiltroMes] = useState('Todos');
   const [filtroCredor, setFiltroCredor] = useState('Todos');
   const [filtroNE, setFiltroNE] = useState('Todos');
   const [filtroProcesso, setFiltroProcesso] = useState('Todos');
   const [filtroUO, setFiltroUO] = useState('Todos');
   const [menuMobileAberto, setMenuMobileAberto] = useState(false);
+
+  const mesesDoAno = [
+    { valor: 'Todos', rotulo: 'Todos os Meses' },
+    { valor: '1', rotulo: 'Janeiro' },
+    { valor: '2', rotulo: 'Fevereiro' },
+    { valor: '3', rotulo: 'Março' },
+    { valor: '4', rotulo: 'Abril' },
+    { valor: '5', rotulo: 'Maio' },
+    { valor: '6', rotulo: 'Junho' },
+    { valor: '7', rotulo: 'Julho' },
+    { valor: '8', rotulo: 'Agosto' },
+    { valor: '9', rotulo: 'Setembro' },
+    { valor: '10', rotulo: 'Outubro' },
+    { valor: '11', rotulo: 'Novembro' },
+    { valor: '12', rotulo: 'Dezembro' }
+  ];
+
+  const obterMesDeRegistro = (item) => {
+    if (!item.Data_Emis) return null;
+    const parts = item.Data_Emis.includes('/') 
+      ? item.Data_Emis.split('/') 
+      : item.Data_Emis.split('-');
+      
+    if (parts.length === 3) {
+      let mesStr = '';
+      if (parts[0].length === 4) {
+        mesStr = parts[1]; // YYYY-MM-DD
+      } else if (parts[2].length === 4) {
+        mesStr = parts[1]; // DD/MM/YYYY
+      } else {
+        mesStr = parts[1];
+      }
+      const mesNum = parseInt(mesStr, 10);
+      return isNaN(mesNum) ? null : mesNum;
+    }
+    return null;
+  };
   const [buscaAuditoriaCredor, setBuscaAuditoriaCredor] = useState('');
   const [buscaAuditoriaNE, setBuscaAuditoriaNE] = useState('');
   const [filtroAuditoriaStatus, setFiltroAuditoriaStatus] = useState('Todos');
@@ -452,7 +490,13 @@ export default function App() {
     const bateProcesso = filtroProcesso === 'Todos' || !filtroProcesso || item.Processo.toLowerCase().includes(filtroProcesso.toLowerCase());
     const bateUO = filtroUO === 'Todos' || !filtroUO || item.UO.toLowerCase().includes(filtroUO.toLowerCase());
 
-    return bateBusca && bateAno && bateCredor && bateNE && bateProcesso && bateUO;
+    let bateMes = true;
+    if (filtroMes !== 'Todos') {
+      const mesReg = obterMesDeRegistro(item);
+      bateMes = mesReg === parseInt(filtroMes, 10);
+    }
+
+    return bateBusca && bateAno && bateCredor && bateNE && bateProcesso && bateUO && bateMes;
   });
 
   // Filtrar opções de cada seletor com base nas outras seleções
@@ -461,7 +505,12 @@ export default function App() {
     const bateNE = filtroNE === 'Todos' || !filtroNE || item.Num_NE.toLowerCase().includes(filtroNE.toLowerCase());
     const bateProcesso = filtroProcesso === 'Todos' || !filtroProcesso || item.Processo.toLowerCase().includes(filtroProcesso.toLowerCase());
     const bateUO = filtroUO === 'Todos' || !filtroUO || item.UO.toLowerCase().includes(filtroUO.toLowerCase());
-    return bateCredor && bateNE && bateProcesso && bateUO;
+    let bateMes = true;
+    if (filtroMes !== 'Todos') {
+      const mesReg = obterMesDeRegistro(item);
+      bateMes = mesReg === parseInt(filtroMes, 10);
+    }
+    return bateCredor && bateNE && bateProcesso && bateUO && bateMes;
   });
 
   const dadosParaCredores = dados.filter(item => {
@@ -469,7 +518,12 @@ export default function App() {
     const bateNE = filtroNE === 'Todos' || !filtroNE || item.Num_NE.toLowerCase().includes(filtroNE.toLowerCase());
     const bateProcesso = filtroProcesso === 'Todos' || !filtroProcesso || item.Processo.toLowerCase().includes(filtroProcesso.toLowerCase());
     const bateUO = filtroUO === 'Todos' || !filtroUO || item.UO.toLowerCase().includes(filtroUO.toLowerCase());
-    return bateAno && bateNE && bateProcesso && bateUO;
+    let bateMes = true;
+    if (filtroMes !== 'Todos') {
+      const mesReg = obterMesDeRegistro(item);
+      bateMes = mesReg === parseInt(filtroMes, 10);
+    }
+    return bateAno && bateNE && bateProcesso && bateUO && bateMes;
   });
 
   const dadosParaNEs = dados.filter(item => {
@@ -477,7 +531,12 @@ export default function App() {
     const bateCredor = filtroCredor === 'Todos' || !filtroCredor || item.Credor.toLowerCase().includes(filtroCredor.toLowerCase());
     const bateProcesso = filtroProcesso === 'Todos' || !filtroProcesso || item.Processo.toLowerCase().includes(filtroProcesso.toLowerCase());
     const bateUO = filtroUO === 'Todos' || !filtroUO || item.UO.toLowerCase().includes(filtroUO.toLowerCase());
-    return bateAno && bateCredor && bateProcesso && bateUO;
+    let bateMes = true;
+    if (filtroMes !== 'Todos') {
+      const mesReg = obterMesDeRegistro(item);
+      bateMes = mesReg === parseInt(filtroMes, 10);
+    }
+    return bateAno && bateCredor && bateProcesso && bateUO && bateMes;
   });
 
   const dadosParaProcessos = dados.filter(item => {
@@ -485,7 +544,12 @@ export default function App() {
     const bateCredor = filtroCredor === 'Todos' || !filtroCredor || item.Credor.toLowerCase().includes(filtroCredor.toLowerCase());
     const bateNE = filtroNE === 'Todos' || !filtroNE || item.Num_NE.toLowerCase().includes(filtroNE.toLowerCase());
     const bateUO = filtroUO === 'Todos' || !filtroUO || item.UO.toLowerCase().includes(filtroUO.toLowerCase());
-    return bateAno && bateCredor && bateNE && bateUO;
+    let bateMes = true;
+    if (filtroMes !== 'Todos') {
+      const mesReg = obterMesDeRegistro(item);
+      bateMes = mesReg === parseInt(filtroMes, 10);
+    }
+    return bateAno && bateCredor && bateNE && bateUO && bateMes;
   });
 
   const dadosParaUOs = dados.filter(item => {
@@ -493,7 +557,12 @@ export default function App() {
     const bateCredor = filtroCredor === 'Todos' || !filtroCredor || item.Credor.toLowerCase().includes(filtroCredor.toLowerCase());
     const bateNE = filtroNE === 'Todos' || !filtroNE || item.Num_NE.toLowerCase().includes(filtroNE.toLowerCase());
     const bateProcesso = filtroProcesso === 'Todos' || !filtroProcesso || item.Processo.toLowerCase().includes(filtroProcesso.toLowerCase());
-    return bateAno && bateCredor && bateNE && bateProcesso;
+    let bateMes = true;
+    if (filtroMes !== 'Todos') {
+      const mesReg = obterMesDeRegistro(item);
+      bateMes = mesReg === parseInt(filtroMes, 10);
+    }
+    return bateAno && bateCredor && bateNE && bateProcesso && bateMes;
   });
 
   const anosDisponiveis = ['Todos', ...new Set(dadosParaAnos.map(item => item.Ano_Processo))].sort();
@@ -634,7 +703,8 @@ export default function App() {
         pdf.setTextColor(71, 85, 105);
         pdf.text("Filtros Ativos:", 12, 43);
         pdf.setFont("helvetica", "normal");
-        pdf.text(`Exercício: ${filtroAno}  |  Credor: ${filtroCredor}  |  NE: ${filtroNE}  |  Processo: ${filtroProcesso}  |  UO: ${filtroUO}`, 12, 48);
+        const rotuloMes = filtroMes === 'Todos' ? 'Todos os Meses' : mesesDoAno.find(m => m.valor === filtroMes)?.rotulo || filtroMes;
+        pdf.text(`Exercício: ${filtroAno}  |  Mês: ${rotuloMes}  |  Credor: ${filtroCredor}  |  NE: ${filtroNE}  |  Processo: ${filtroProcesso}  |  UO: ${filtroUO}`, 12, 48);
 
         // Desenhar Tabela de KPIs (Vetorizada)
         let startY = 56;
@@ -1158,8 +1228,8 @@ export default function App() {
                     />
                   </div>
 
-                  {/* Grid de 5 Filtros Específicos */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+                  {/* Grid de 6 Filtros Específicos */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-4">
                     {/* Exercício */}
                     <div className="flex flex-col text-left">
                       <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Exercício</label>
@@ -1169,6 +1239,18 @@ export default function App() {
                         className={`w-full px-3 py-2 rounded-xl border outline-none text-xs transition ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
                       >
                         {anosDisponiveis.map(ano => <option key={ano} value={ano}>{ano === 'Todos' ? 'Todos os Anos' : ano}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Mês */}
+                    <div className="flex flex-col text-left">
+                      <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Mês</label>
+                      <select
+                        value={filtroMes}
+                        onChange={(e) => setFiltroMes(e.target.value)}
+                        className={`w-full px-3 py-2 rounded-xl border outline-none text-xs transition ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-indigo-500' : 'bg-slate-50 border-slate-200 focus:border-indigo-500'}`}
+                      >
+                        {mesesDoAno.map(mes => <option key={mes.valor} value={mes.valor}>{mes.rotulo}</option>)}
                       </select>
                     </div>
 
