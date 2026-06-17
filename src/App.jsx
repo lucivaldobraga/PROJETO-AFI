@@ -6,7 +6,7 @@ import {
 import {
   LayoutDashboard, TrendingUp, AlertTriangle, Upload, Users, LogOut, Sun, Moon, Search,
   Download, FileSpreadsheet, Plus, ShieldCheck, FileDown, AlertCircle, RefreshCw, Trash2,
-  ChevronDown, X
+  ChevronDown, X, Menu
 } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
@@ -592,12 +592,15 @@ export default function App() {
         setLoadingFirebase(true);
         try {
           await firebaseService.removerArquivo(nomeOriginal);
+          customAlert("Sucesso", "Arquivo e empenhos excluídos com sucesso!", "success");
+          setArquivos(prev => prev.filter(a => a.nome_original !== nomeOriginal));
+          setDados(prev => prev.filter(d => d.arquivo_origem !== nomeOriginal));
         } catch (err) {
-          console.warn("Removendo localmente.");
+          console.error("Erro ao deletar arquivo:", err);
+          customAlert("Erro", "Erro ao excluir arquivo no Firebase: " + err.message, "error");
+        } finally {
+          setLoadingFirebase(false);
         }
-        setArquivos(prev => prev.filter(a => a.nome_original !== nomeOriginal));
-        setDados(prev => prev.filter(d => d.arquivo_origem !== nomeOriginal));
-        setLoadingFirebase(false);
       }
     );
   };
@@ -1257,8 +1260,20 @@ export default function App() {
   return (
     <div className={`min-h-screen flex transition-colors duration-300 ${darkMode ? 'custom-bg-dark text-slate-100' : 'custom-bg-light text-slate-800'}`}>
 
-      {/* Sidebar Fixo Lateral */}
-      <aside className={`w-72 flex-shrink-0 border-r ${darkMode ? 'custom-sidebar-dark text-slate-200' : 'custom-sidebar-light text-slate-800'} p-6 flex flex-col`}>
+      {/* Overlay escuro para mobile */}
+      {menuMobileAberto && (
+        <div 
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-40 lg:hidden transition-all duration-300 animate-fadeIn"
+          onClick={() => setMenuMobileAberto(false)}
+        />
+      )}
+
+      {/* Sidebar Lateral Responsivo */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-72 p-6 flex flex-col border-r transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 flex-shrink-0
+        ${menuMobileAberto ? 'translate-x-0' : '-translate-x-full'}
+        ${darkMode ? 'custom-sidebar-dark text-slate-200' : 'custom-sidebar-light text-slate-800'}
+      `}>
         <div>
           {/* Logo e Nome Centralizados */}
           <div className="flex flex-col items-center text-center gap-2 mb-8">
@@ -1275,32 +1290,32 @@ export default function App() {
 
           <nav className="space-y-1">
             <button
-              onClick={() => setCurrentPage('dashboard')}
+              onClick={() => { setCurrentPage('dashboard'); setMenuMobileAberto(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all text-sm font-semibold ${currentPage === 'dashboard' ? 'm3-nav-item-active' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-850 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-slate-200'}`}
             >
               <LayoutDashboard size={18} /> Dashboard Geral
             </button>
             <button
-              onClick={() => setCurrentPage('avancados')}
+              onClick={() => { setCurrentPage('avancados'); setMenuMobileAberto(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all text-sm font-semibold ${currentPage === 'avancados' ? 'm3-nav-item-active' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-850 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-slate-200'}`}
             >
               <TrendingUp size={18} /> Visuais Avançados
             </button>
             <button
-              onClick={() => setCurrentPage('auditoria')}
+              onClick={() => { setCurrentPage('auditoria'); setMenuMobileAberto(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all text-sm font-semibold ${currentPage === 'auditoria' ? 'm3-nav-item-active' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-850 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-slate-200'}`}
             >
               <AlertTriangle size={18} /> Matriz de Gargalos
             </button>
             <button
-              onClick={() => setCurrentPage('upload')}
+              onClick={() => { setCurrentPage('upload'); setMenuMobileAberto(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all text-sm font-semibold ${currentPage === 'upload' ? 'm3-nav-item-active' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-850 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-slate-200'}`}
             >
               <Upload size={18} /> Upload e Histórico
             </button>
             {user?.role === 'admin' && (
               <button
-                onClick={() => setCurrentPage('usuarios')}
+                onClick={() => { setCurrentPage('usuarios'); setMenuMobileAberto(false); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-full transition-all text-sm font-semibold ${currentPage === 'usuarios' ? 'm3-nav-item-active' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-850 dark:text-slate-400 dark:hover:bg-slate-800/40 dark:hover:text-slate-200'}`}
               >
                 <Users size={18} /> Gerenciar Usuários
@@ -1375,10 +1390,19 @@ export default function App() {
         )}
 
         {/* Topbar Header */}
-        <header className="flex justify-between items-center mb-8 max-w-7xl mx-auto w-full">
-          <div>
-            <span className="text-xs font-bold text-slate-400 tracking-widest uppercase">DAF - DIRETORIA ADMINISTRATIVO FINANCEIRO</span>
-            <h2 className="text-3xl font-extrabold tracking-tight">Painel de Execução Orçamentária </h2>
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 max-w-7xl mx-auto w-full">
+          <div className="flex items-center gap-4 min-w-0">
+            <button
+              onClick={() => setMenuMobileAberto(true)}
+              className="p-2.5 rounded-xl bg-slate-150 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 lg:hidden flex-shrink-0"
+              title="Menu"
+            >
+              <Menu size={18} />
+            </button>
+            <div className="min-w-0">
+              <span className="text-[10px] sm:text-xs font-bold text-slate-400 tracking-widest uppercase block">DAF - DIRETORIA ADMINISTRATIVO FINANCEIRO</span>
+              <h2 className="text-xl sm:text-3xl font-extrabold tracking-tight truncate">Painel de Execução Orçamentária </h2>
+            </div>
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto hide-in-pdf">
             {!exportandoPDF && (
@@ -1575,7 +1599,7 @@ export default function App() {
                   </div>
 
                   {/* Gráfico: Empenhos para a Data de Hoje */}
-                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm lg:col-span-2`}>
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm lg:col-span-2 overflow-hidden`}>
                     <h3 className="text-base font-extrabold tracking-tight mb-4">Empenhos para a Data de Hoje</h3>
                     <div className="h-64 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-800" style={{ minHeight: '250px', minWidth: '0' }} id="grafico-hoje">
                       {empenhosHoje.length > 0 ? (
@@ -1650,7 +1674,7 @@ export default function App() {
 
                 {/* Graficos Gerais (Abaixo da Seção de Hoje) */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm overflow-hidden`}>
                     <h3 className="text-base font-bold mb-4">Evolução Mensal (Empenhado vs Pago)</h3>
                     <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }} id="grafico-evolucao">
                       <ResponsiveContainer width="100%" height="100%">
@@ -1677,7 +1701,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm overflow-hidden`}>
                     <h3 className="text-base font-bold mb-4">Total Pago vs Empenhado por Exercício</h3>
                     <div className="h-80" style={{ minHeight: '320px', minWidth: '0' }} id="grafico-exercicio">
                       <ResponsiveContainer width="100%" height="100%">
@@ -1706,7 +1730,7 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm overflow-hidden`}>
                     <h3 className="text-base font-bold mb-4">Maiores Orçamentos por Credor</h3>
                     <div className="h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-800" style={{ minHeight: '320px', minWidth: '0' }} id="grafico-credores">
                       <div style={{ height: `${Math.max(320, maioresCredores.length * 45)}px` }}>
@@ -1733,7 +1757,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm overflow-hidden`}>
                     <h3 className="text-base font-bold mb-4">Maiores Gastos por Unidade Orçamentária (UO)</h3>
                     <div className="h-80 overflow-x-auto overflow-y-hidden pr-2 scrollbar-thin scrollbar-thumb-slate-800" style={{ minHeight: '320px', minWidth: '0' }} id="grafico-uos">
                       <div style={{ width: `${Math.max(450, despesasPorUO.length * 85)}px`, height: '100%' }}>
@@ -1876,7 +1900,7 @@ export default function App() {
             {currentPage === 'avancados' && (
               <div className="space-y-8 animate-fadeIn max-w-7xl mx-auto w-full">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm col-span-2`}>
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm col-span-2 overflow-hidden`}>
                     <h3 className="text-base font-bold mb-4">Empenhos por Natureza</h3>
                     <div className="h-80 flex flex-col md:flex-row items-center justify-around">
                       <div className="h-64 w-full md:w-3/5" id="grafico-natureza">
@@ -1969,7 +1993,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm overflow-hidden`}>
                   <h3 className="text-base font-bold mb-4">Funil Orçamentário</h3>
                   <div className="h-80" id="grafico-funil">
                     <ResponsiveContainer width="100%" height="100%">

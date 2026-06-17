@@ -192,6 +192,7 @@ export const firebaseService = {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       const profileDoc = await getDoc(doc(db, 'usuarios', userCredential.user.uid));
+      
       if (profileDoc.exists()) {
         return {
           uid: userCredential.user.uid,
@@ -199,25 +200,28 @@ export const firebaseService = {
           ...profileDoc.data()
         };
       }
-      const fallbackProfile = {
-        uid: userCredential.user.uid,
-        email: userCredential.user.email.toLowerCase(),
-        name: userCredential.user.email.split('@')[0],
-        role: userCredential.user.email.toLowerCase() === 'lucivaldo586@gmail.com' ? 'admin' : 'viewer',
-        setor: 'Geral'
-      };
+      
+      // Se for o admin padrão, permite auto-provisionar
       if (userCredential.user.email.toLowerCase() === 'lucivaldo586@gmail.com') {
+        const fallbackProfile = {
+          uid: userCredential.user.uid,
+          email: userCredential.user.email.toLowerCase(),
+          name: 'Lucivaldo Braga',
+          role: 'admin',
+          setor: 'Diretoria'
+        };
         await setDoc(doc(db, 'usuarios', userCredential.user.uid), {
           name: 'Lucivaldo Braga',
           email: userCredential.user.email.toLowerCase(),
           role: 'admin',
           setor: 'Diretoria'
         });
-        fallbackProfile.name = 'Lucivaldo Braga';
-        fallbackProfile.role = 'admin';
-        fallbackProfile.setor = 'Diretoria';
+        return fallbackProfile;
       }
-      return fallbackProfile;
+      
+      // Para qualquer outro usuário cujo perfil no Firestore não exista, bloqueia e desloga
+      await signOut(auth);
+      throw new Error("Acesso negado. Seu usuário foi removido ou não está cadastrado pelo administrador.");
     } catch (error) {
       if (normalizedEmail === 'lucivaldo586@gmail.com' && password === 'admin123') {
         try {
@@ -282,13 +286,9 @@ export const firebaseService = {
                 setor: 'Diretoria'
               });
             } else {
-              callback({
-                uid: currentUser.uid,
-                email: userEmail,
-                name: userEmail.split('@')[0],
-                role: 'viewer',
-                setor: 'Geral'
-              });
+              // Bloqueia e desloga se o perfil no Firestore foi removido
+              await signOut(auth);
+              callback(null);
             }
           }
         } catch (e) {
@@ -407,16 +407,28 @@ export const firebaseService = {
       return mockService.removerArquivo(nomeOriginal);
     }
     try {
+      // Deletar metadados do arquivo
       const qArq = query(collection(db, 'arquivos'), where('nome_original', '==', nomeOriginal));
       const snapArq = await getDocs(qArq);
-      for (const docSnap of snapArq.docs) {
-        await deleteDoc(doc(db, 'arquivos', docSnap.id));
-      }
+      const batchArq = writeBatch(db);
+      snapArq.forEach(docSnap => {
+        batchArq.delete(doc(db, 'arquivos', docSnap.id));
+      });
+      await batchArq.commit();
 
+      // Deletar os orçamentos associados em lotes de no máximo 400
       const qOrc = query(collection(db, 'orcamentos'), where('arquivo_origem', '==', nomeOriginal));
       const snapOrc = await getDocs(qOrc);
-      for (const docSnap of snapOrc.docs) {
-        await deleteDoc(doc(db, 'orcamentos', docSnap.id));
+      const orcDocs = snapOrc.docs;
+      
+      const chunk = 400;
+      for (let i = 0; i < orcDocs.length; i += chunk) {
+        const batch = writeBatch(db);
+        const lote = orcDocs.slice(i, i + chunk);
+        for (const docSnap of lote) {
+          batch.delete(doc(db, 'orcamentos', docSnap.id));
+        }
+        await batch.commit();
       }
       return true;
     } catch (error) {
