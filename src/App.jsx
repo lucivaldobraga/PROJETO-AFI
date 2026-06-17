@@ -167,6 +167,7 @@ export default function App() {
   const [busca, setBusca] = useState('');
   const [filtroAno, setFiltroAno] = useState('Todos');
   const [filtroMes, setFiltroMes] = useState('Todos');
+  const [ordenacaoCredores, setOrdenacaoCredores] = useState({ campo: 'Empenhado', direcao: 'desc' });
   const [filtroCredor, setFiltroCredor] = useState('Todos');
   const [filtroNE, setFiltroNE] = useState('Todos');
   const [filtroProcesso, setFiltroProcesso] = useState('Todos');
@@ -380,6 +381,61 @@ export default function App() {
     } finally {
       setLoadingFirebase(false);
     }
+  };
+
+  const exportarBackupJSON = () => {
+    try {
+      const backupData = {
+        dados,
+        arquivos
+      };
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `afi_backup_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      customAlert('Sucesso', 'Backup JSON exportado com sucesso!', 'success');
+    } catch (err) {
+      customAlert('Erro', 'Falha ao exportar backup JSON: ' + err.message, 'error');
+    }
+  };
+
+  const importarBackupJSON = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const parsed = JSON.parse(evt.target.result);
+        if (!parsed.dados || !parsed.arquivos) {
+          throw new Error('Formato de backup inválido. Chaves "dados" ou "arquivos" ausentes.');
+        }
+        
+        setLoadingFirebase(true);
+        if (firebaseService.isLocalSandbox()) {
+          localStorage.setItem('afi_orcamentos', JSON.stringify(parsed.dados));
+          localStorage.setItem('afi_arquivos', JSON.stringify(parsed.arquivos));
+          setDados(parsed.dados);
+          setArquivos(parsed.arquivos);
+          customAlert('Sucesso', 'Backup importado com sucesso no Modo Sandbox!', 'success');
+        } else {
+          for (const arq of parsed.arquivos) {
+            const fileData = parsed.dados.filter(d => d.arquivo_origem === arq.nome_original);
+            await firebaseService.adicionarRegistros(fileData, arq.nome_original);
+          }
+          await carregarDadosFirebase();
+          customAlert('Sucesso', 'Backup importado e sincronizado com o Firebase!', 'success');
+        }
+      } catch (err) {
+        customAlert('Erro', 'Falha ao importar backup: ' + err.message, 'error');
+      } finally {
+        setLoadingFirebase(false);
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
   };
 
   // Forçar tema escuro permanentemente
@@ -998,13 +1054,34 @@ export default function App() {
       if (existente) {
         existente.Empenhado += item.Emp_Acum || 0;
         existente.Pago += item.Pago_Acum || 0;
+        existente.aLiquidar += item.A_Liquidar || 0;
+        existente.aPagar += item.A_Pagar || 0;
       } else {
-        acc.push({ name: credor, Empenhado: item.Emp_Acum || 0, Pago: item.Pago_Acum || 0 });
+        acc.push({ 
+          name: credor, 
+          Empenhado: item.Emp_Acum || 0, 
+          Pago: item.Pago_Acum || 0,
+          aLiquidar: item.A_Liquidar || 0,
+          aPagar: item.A_Pagar || 0
+        });
       }
       return acc;
     }, []);
     return agrupado.sort((a, b) => b.Empenhado - a.Empenhado);
   })();
+
+  const tabelaCredores = React.useMemo(() => {
+    const clones = [...maioresCredores];
+    const { campo, direcao } = ordenacaoCredores;
+    return clones.sort((a, b) => {
+      let valA = a[campo];
+      let valB = b[campo];
+      if (campo === 'name') {
+        return direcao === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      return direcao === 'asc' ? valA - valB : valB - valA;
+    });
+  }, [maioresCredores, ordenacaoCredores]);
 
   const chartDadosHoje = (() => {
     const agrupado = empenhosHoje.reduce((acc, item) => {
@@ -1165,6 +1242,21 @@ export default function App() {
               <button onClick={carregarDadosFirebase} className="hover:text-indigo-500 dark:hover:text-indigo-400 transition" title="Carregar Dados">
                 <RefreshCw size={12} className={loadingFirebase ? 'animate-spin' : ''} />
               </button>
+            </div>
+
+            {/* Status do Banco de Dados */}
+            <div className="px-3">
+              {firebaseService.isLocalSandbox() ? (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                  Modo Local (Sandbox)
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  Conexão Online
+                </div>
+              )}
             </div>
 
             {/* Informações do Usuário (Sem foto de perfil) */}
@@ -1577,6 +1669,112 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Tabela Detalhada de Credores */}
+                <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
+                  <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">Detalhamento dos Credores</h3>
+                      <p className="text-xs text-slate-400">Valores consolidados por credor no período selecionado</p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800/60">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-100 dark:bg-slate-900/80 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800/60">
+                          <th 
+                            className="p-4 cursor-pointer hover:text-indigo-500 transition-colors select-none text-left"
+                            onClick={() => {
+                              const novaDirecao = ordenacaoCredores.campo === 'name' && ordenacaoCredores.direcao === 'desc' ? 'asc' : 'desc';
+                              setOrdenacaoCredores({ campo: 'name', direcao: novaDirecao });
+                            }}
+                          >
+                            <div className="flex items-center gap-1.5">
+                              Credor
+                              {ordenacaoCredores.campo === 'name' && (
+                                <ChevronDown size={14} className={`transform transition-transform ${ordenacaoCredores.direcao === 'asc' ? 'rotate-180' : ''}`} />
+                              )}
+                            </div>
+                          </th>
+                          <th 
+                            className="p-4 text-right cursor-pointer hover:text-indigo-500 transition-colors select-none"
+                            onClick={() => {
+                              const novaDirecao = ordenacaoCredores.campo === 'Empenhado' && ordenacaoCredores.direcao === 'desc' ? 'asc' : 'desc';
+                              setOrdenacaoCredores({ campo: 'Empenhado', direcao: novaDirecao });
+                            }}
+                          >
+                            <div className="flex items-center justify-end gap-1.5">
+                              Empenhado
+                              {ordenacaoCredores.campo === 'Empenhado' && (
+                                <ChevronDown size={14} className={`transform transition-transform ${ordenacaoCredores.direcao === 'asc' ? 'rotate-180' : ''}`} />
+                              )}
+                            </div>
+                          </th>
+                          <th 
+                            className="p-4 text-right cursor-pointer hover:text-indigo-500 transition-colors select-none"
+                            onClick={() => {
+                              const novaDirecao = ordenacaoCredores.campo === 'Pago' && ordenacaoCredores.direcao === 'desc' ? 'asc' : 'desc';
+                              setOrdenacaoCredores({ campo: 'Pago', direcao: novaDirecao });
+                            }}
+                          >
+                            <div className="flex items-center justify-end gap-1.5">
+                              Pago
+                              {ordenacaoCredores.campo === 'Pago' && (
+                                <ChevronDown size={14} className={`transform transition-transform ${ordenacaoCredores.direcao === 'asc' ? 'rotate-180' : ''}`} />
+                              )}
+                            </div>
+                          </th>
+                          <th 
+                            className="p-4 text-right cursor-pointer hover:text-indigo-500 transition-colors select-none"
+                            onClick={() => {
+                              const novaDirecao = ordenacaoCredores.campo === 'aLiquidar' && ordenacaoCredores.direcao === 'desc' ? 'asc' : 'desc';
+                              setOrdenacaoCredores({ campo: 'aLiquidar', direcao: novaDirecao });
+                            }}
+                          >
+                            <div className="flex items-center justify-end gap-1.5">
+                              A Liquidar
+                              {ordenacaoCredores.campo === 'aLiquidar' && (
+                                <ChevronDown size={14} className={`transform transition-transform ${ordenacaoCredores.direcao === 'asc' ? 'rotate-180' : ''}`} />
+                              )}
+                            </div>
+                          </th>
+                          <th 
+                            className="p-4 text-right cursor-pointer hover:text-indigo-500 transition-colors select-none"
+                            onClick={() => {
+                              const novaDirecao = ordenacaoCredores.campo === 'aPagar' && ordenacaoCredores.direcao === 'desc' ? 'asc' : 'desc';
+                              setOrdenacaoCredores({ campo: 'aPagar', direcao: novaDirecao });
+                            }}
+                          >
+                            <div className="flex items-center justify-end gap-1.5">
+                              A Pagar
+                              {ordenacaoCredores.campo === 'aPagar' && (
+                                <ChevronDown size={14} className={`transform transition-transform ${ordenacaoCredores.direcao === 'asc' ? 'rotate-180' : ''}`} />
+                              )}
+                            </div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-semibold">
+                        {tabelaCredores.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="p-8 text-center text-slate-400">Nenhum credor encontrado para os filtros selecionados.</td>
+                          </tr>
+                        ) : (
+                          tabelaCredores.map((cred, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors text-slate-700 dark:text-slate-200">
+                              <td className="p-4 truncate max-w-xs font-bold text-slate-950 dark:text-white text-left">{cred.name}</td>
+                              <td className="p-4 text-right text-indigo-500">{formatarMoeda(cred.Empenhado)}</td>
+                              <td className="p-4 text-right text-emerald-500">{formatarMoeda(cred.Pago)}</td>
+                              <td className="p-4 text-right text-amber-500">{formatarMoeda(cred.aLiquidar)}</td>
+                              <td className="p-4 text-right text-rose-500">{formatarMoeda(cred.aPagar)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
               </div>
             )}
 
@@ -1817,10 +2015,22 @@ export default function App() {
               <h3 className="text-base font-bold mb-1">Importar Relatório Orçamentário (AFI)</h3>
               <p className="text-xs text-slate-400 mb-6 max-w-sm">Envie arquivos no formato original <span className="font-semibold text-indigo-500">.xls</span> ou <span className="font-semibold text-indigo-500">.xlsx</span> do AFI.</p>
 
-              <label className="cursor-pointer px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow">
-                Escolher Arquivo Bruto
-                <input type="file" accept=".xls,.xlsx" className="hidden" onChange={handleUploadReal} />
-              </label>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <label className="cursor-pointer px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow">
+                  Escolher Arquivo Bruto
+                  <input type="file" accept=".xls,.xlsx" className="hidden" onChange={handleUploadReal} />
+                </label>
+                <button
+                  onClick={exportarBackupJSON}
+                  className="px-5 py-2.5 bg-slate-600 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition shadow flex items-center gap-2"
+                >
+                  <Download size={14} /> Exportar Backup JSON
+                </button>
+                <label className="cursor-pointer px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition shadow flex items-center gap-2">
+                  <Upload size={14} /> Importar Backup JSON
+                  <input type="file" accept=".json" className="hidden" onChange={importarBackupJSON} />
+                </label>
+              </div>
             </div>
 
             <div className={`p-6 rounded-2xl border ${darkMode ? 'custom-card-dark' : 'custom-card-light'} shadow-sm`}>
