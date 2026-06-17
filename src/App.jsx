@@ -144,6 +144,7 @@ export default function App() {
   const [dados, setDados] = useState([]);
   const [arquivos, setArquivos] = useState([]);
   const [loadingFirebase, setLoadingFirebase] = useState(false);
+  const [connectionError, setConnectionError] = useState(null);
 
   const [usuariosAutorizados, setUsuariosAutorizados] = useState([]);
 
@@ -363,7 +364,7 @@ export default function App() {
   };
 
   const removerUsuario = (email) => {
-    if (email === 'lucivaldo586@gmail.com') {
+    if (email.toLowerCase() === 'lucivaldo586@gmail.com') {
       customAlert("Aviso", "Não é possível remover o administrador padrão!", "warning");
       return;
     }
@@ -407,16 +408,27 @@ export default function App() {
         setLoadingFirebase(true);
         unsubscribeOrcamentos = firebaseService.assinarOrcamentos((novosOrcamentos) => {
           setDados(novosOrcamentos);
+          setConnectionError(null);
+          setLoadingFirebase(false);
+        }, (error) => {
+          console.error("Erro ao assinar orçamentos:", error);
+          setConnectionError("Falha na sincronização online (Firestore). Verifique se o Cloud Firestore está ativo e se as regras de segurança foram aplicadas no console do Firebase.");
           setLoadingFirebase(false);
         });
 
         unsubscribeArquivos = firebaseService.assinarArquivos((novosArquivos) => {
           setArquivos(novosArquivos);
+          setConnectionError(null);
+          setLoadingFirebase(false);
+        }, (error) => {
+          console.error("Erro ao assinar arquivos:", error);
+          setConnectionError("Falha na sincronização online (Firestore). Verifique se o Cloud Firestore está ativo e se as regras de segurança foram aplicadas no console do Firebase.");
           setLoadingFirebase(false);
         });
       } else {
         setIsAuthenticated(false);
         setUser(null);
+        setConnectionError(null);
         if (unsubscribeOrcamentos) unsubscribeOrcamentos();
         if (unsubscribeArquivos) unsubscribeArquivos();
         setDados([]);
@@ -1342,6 +1354,26 @@ export default function App() {
       {/* Conteúdo Principal */}
       <main className="flex-1 overflow-y-auto p-10 font-sans" id="dashboard-view">
 
+        {connectionError && (
+          <div className="mb-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-semibold flex items-center justify-between gap-3 max-w-7xl mx-auto w-full animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse flex-shrink-0"></span>
+              <div>
+                <strong>Aviso de Sincronismo Online:</strong> {connectionError}
+              </div>
+            </div>
+            <button 
+              onClick={() => {
+                setConnectionError(null);
+                carregarDadosFirebase();
+              }} 
+              className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-[10px] transition"
+            >
+              Recarregar
+            </button>
+          </div>
+        )}
+
         {/* Topbar Header */}
         <header className="flex justify-between items-center mb-8 max-w-7xl mx-auto w-full">
           <div>
@@ -2266,7 +2298,7 @@ export default function App() {
                         </div>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{usr.email}</p>
                         <div className="flex flex-col gap-y-1 pt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                          <div>Setor: <strong className="text-slate-700 dark:text-slate-200 font-bold">{usr.setor || (usr.email === 'lucivaldo586@gmail.com' ? 'Diretoria' : 'Não Informado')}</strong></div>
+                          <div>Setor: <strong className="text-slate-700 dark:text-slate-200 font-bold">{usr.setor || (usr.email?.toLowerCase() === 'lucivaldo586@gmail.com' ? 'Diretoria' : 'Não Informado')}</strong></div>
                           {firebaseService.isLocalSandbox() && (
                             <div>Senha: <code className="bg-slate-200/50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded font-mono font-bold text-[10px]">{usr.password || '123456'}</code></div>
                           )}
@@ -2279,7 +2311,7 @@ export default function App() {
                         >
                           Editar
                         </button>
-                        {usr.email !== 'lucivaldo586@gmail.com' && (
+                        {usr.email?.toLowerCase() !== 'lucivaldo586@gmail.com' && (
                           <button
                             onClick={() => removerUsuario(usr.email)}
                             className="px-3 py-1.5 bg-rose-600/15 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/20 rounded-xl text-[10px] font-bold transition duration-300"

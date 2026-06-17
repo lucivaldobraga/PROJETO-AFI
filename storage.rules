@@ -1,7 +1,7 @@
 rules_version = '2';
 
 service firebase.storage {
-  match /b2b/{bucket}/o {
+  match /b/{bucket}/o {
     
     // Helper: verifica se o usuário está autenticado
     function isAuthenticated() {
@@ -11,7 +11,7 @@ service firebase.storage {
     // Helper: verifica se o usuário logado é admin
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email == 'lucivaldo586@gmail.com'
+        request.auth.token.email.matches('(?i)^lucivaldo586@gmail\\.com$')
       );
     }
 

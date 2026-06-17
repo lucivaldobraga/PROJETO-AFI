@@ -188,27 +188,28 @@ export const firebaseService = {
     if (firebaseService.isLocalSandbox()) {
       return mockService.login(email, password);
     }
+    const normalizedEmail = email.trim().toLowerCase();
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       const profileDoc = await getDoc(doc(db, 'usuarios', userCredential.user.uid));
       if (profileDoc.exists()) {
         return {
           uid: userCredential.user.uid,
-          email: userCredential.user.email,
+          email: userCredential.user.email.toLowerCase(),
           ...profileDoc.data()
         };
       }
       const fallbackProfile = {
         uid: userCredential.user.uid,
-        email: userCredential.user.email,
+        email: userCredential.user.email.toLowerCase(),
         name: userCredential.user.email.split('@')[0],
-        role: userCredential.user.email === 'lucivaldo586@gmail.com' ? 'admin' : 'viewer',
+        role: userCredential.user.email.toLowerCase() === 'lucivaldo586@gmail.com' ? 'admin' : 'viewer',
         setor: 'Geral'
       };
-      if (userCredential.user.email === 'lucivaldo586@gmail.com') {
+      if (userCredential.user.email.toLowerCase() === 'lucivaldo586@gmail.com') {
         await setDoc(doc(db, 'usuarios', userCredential.user.uid), {
           name: 'Lucivaldo Braga',
-          email: userCredential.user.email,
+          email: userCredential.user.email.toLowerCase(),
           role: 'admin',
           setor: 'Diretoria'
         });
@@ -218,19 +219,19 @@ export const firebaseService = {
       }
       return fallbackProfile;
     } catch (error) {
-      if (email.toLowerCase() === 'lucivaldo586@gmail.com' && password === 'admin123') {
+      if (normalizedEmail === 'lucivaldo586@gmail.com' && password === 'admin123') {
         try {
-          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          const userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
           const fallbackProfile = {
             uid: userCredential.user.uid,
-            email: userCredential.user.email,
+            email: userCredential.user.email.toLowerCase(),
             name: 'Lucivaldo Braga',
             role: 'admin',
             setor: 'Diretoria'
           };
           await setDoc(doc(db, 'usuarios', userCredential.user.uid), {
             name: 'Lucivaldo Braga',
-            email: userCredential.user.email,
+            email: userCredential.user.email.toLowerCase(),
             role: 'admin',
             setor: 'Diretoria'
           });
@@ -261,20 +262,21 @@ export const firebaseService = {
           if (profileDoc.exists()) {
             callback({
               uid: currentUser.uid,
-              email: currentUser.email,
+              email: currentUser.email.toLowerCase(),
               ...profileDoc.data()
             });
           } else {
-            if (currentUser.email === 'lucivaldo586@gmail.com') {
+            const userEmail = currentUser.email.toLowerCase();
+            if (userEmail === 'lucivaldo586@gmail.com') {
               await setDoc(doc(db, 'usuarios', currentUser.uid), {
                 name: 'Lucivaldo Braga',
-                email: currentUser.email,
+                email: userEmail,
                 role: 'admin',
                 setor: 'Diretoria'
               });
               callback({
                 uid: currentUser.uid,
-                email: currentUser.email,
+                email: userEmail,
                 name: 'Lucivaldo Braga',
                 role: 'admin',
                 setor: 'Diretoria'
@@ -282,8 +284,8 @@ export const firebaseService = {
             } else {
               callback({
                 uid: currentUser.uid,
-                email: currentUser.email,
-                name: currentUser.email.split('@')[0],
+                email: userEmail,
+                name: userEmail.split('@')[0],
                 role: 'viewer',
                 setor: 'Geral'
               });
@@ -291,11 +293,13 @@ export const firebaseService = {
           }
         } catch (e) {
           console.warn("Erro ao ler dados adicionais do perfil:", e);
+          const userEmail = currentUser.email.toLowerCase();
           callback({
             uid: currentUser.uid,
-            email: currentUser.email,
-            name: currentUser.email.split('@')[0],
-            role: 'viewer'
+            email: userEmail,
+            name: userEmail === 'lucivaldo586@gmail.com' ? 'Lucivaldo Braga' : userEmail.split('@')[0],
+            role: userEmail === 'lucivaldo586@gmail.com' ? 'admin' : 'viewer',
+            setor: userEmail === 'lucivaldo586@gmail.com' ? 'Diretoria' : 'Geral'
           });
         }
       } else {
@@ -325,24 +329,25 @@ export const firebaseService = {
     if (firebaseService.isLocalSandbox()) {
       return mockService.criarUsuario(email, password, perfil);
     }
+    const normalizedEmail = email.trim().toLowerCase();
     try {
       const secondaryAppName = 'SecondaryAuth' + Date.now();
       const secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
       const secondaryAuth = getAuth(secondaryApp);
       
-      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, normalizedEmail, password);
       const uid = userCredential.user.uid;
       
       await signOut(secondaryAuth);
       
       await setDoc(doc(db, 'usuarios', uid), {
-        email,
+        email: normalizedEmail,
         name: perfil.name,
         role: perfil.role,
         setor: perfil.setor
       });
       
-      return { uid, email, ...perfil };
+      return { uid, email: normalizedEmail, ...perfil };
     } catch (e) {
       console.error("Erro ao criar usuário no Firebase Auth:", e);
       throw e;
@@ -415,8 +420,8 @@ export const firebaseService = {
       }
       return true;
     } catch (error) {
-      console.error("Erro ao deletar arquivo, usando fallback local:", error);
-      return mockService.removerArquivo(nomeOriginal);
+      console.error("Erro ao deletar arquivo no Firestore:", error);
+      throw new Error("Não foi possível excluir o arquivo no Firebase. Verifique sua conexão e permissões do Firestore. Detalhes: " + error.message);
     }
   },
 
@@ -459,12 +464,12 @@ export const firebaseService = {
         await batch.commit();
       }
     } catch (e) {
-      console.error("Erro ao salvar no Firestore, usando fallback local:", e);
-      await mockService.adicionarRegistrosLocais(registros, nomeArquivo);
+      console.error("Erro ao salvar dados no Firestore:", e);
+      throw new Error("Falha ao salvar os dados online no Firebase. Verifique se o Cloud Firestore está ativo e as regras de segurança aplicadas no console do Firebase. Detalhes: " + e.message);
     }
   },
 
-  assinarOrcamentos: (onUpdate) => {
+  assinarOrcamentos: (onUpdate, onError) => {
     if (firebaseService.isLocalSandbox()) {
       onUpdate(JSON.parse(localStorage.getItem('afi_orcamentos') || '[]'));
       return () => {};
@@ -478,10 +483,11 @@ export const firebaseService = {
       onUpdate(records);
     }, (error) => {
       console.warn("Erro ao ouvir orçamentos:", error);
+      if (onError) onError(error);
     });
   },
 
-  assinarArquivos: (onUpdate) => {
+  assinarArquivos: (onUpdate, onError) => {
     if (firebaseService.isLocalSandbox()) {
       onUpdate(JSON.parse(localStorage.getItem('afi_arquivos') || '[]'));
       return () => {};
@@ -495,6 +501,7 @@ export const firebaseService = {
       onUpdate(records);
     }, (error) => {
       console.warn("Erro ao ouvir arquivos:", error);
+      if (onError) onError(error);
     });
   },
 

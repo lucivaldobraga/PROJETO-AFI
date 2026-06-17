@@ -11,7 +11,7 @@ service cloud.firestore {
     // Helper: verifica se o usuário logado é o administrador padrão (Lucivaldo) ou possui a flag no perfil
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email == 'lucivaldo586@gmail.com' ||
+        request.auth.token.email.matches('(?i)^lucivaldo586@gmail\\.com$') ||
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == 'admin'
       );
     }
@@ -19,7 +19,7 @@ service cloud.firestore {
     // Helper: verifica se o usuário possui um perfil ativo cadastrado
     function hasActiveProfile() {
       return isAuthenticated() && (
-        request.auth.token.email == 'lucivaldo586@gmail.com' ||
+        request.auth.token.email.matches('(?i)^lucivaldo586@gmail\\.com$') ||
         exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
       );
     }
